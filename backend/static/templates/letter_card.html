@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{{ client_name }} — Portfolio Review, {{ month_long }}</title>
+
+<style>
+    :root {
+        --ink: #0f172a;
+        --muted: #475569;
+        --soft: #64748b;
+        --line: #e2e8f0;
+        --bg: #f8fafc;
+        --primary: #1e3a8a;
+        --primary-light: #3b82f6;
+        --accent: #d4af37;
+        --good: #16a34a;
+        --bad: #dc2626;
+        --warn: #d97706;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        color: var(--ink);
+        background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 320px);
+        line-height: 1.55;
+        font-size: 14.5px;
+    }
+    .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 32px 28px 80px;
+    }
+
+    /* ───── Hero band ───── */
+    .hero {
+        background: linear-gradient(135deg, #1e3a8a 0%, #4338ca 70%, #6366f1 100%);
+        color: #fff;
+        border-radius: 18px;
+        padding: 28px 32px;
+        box-shadow: 0 18px 40px -22px rgba(30, 58, 138, 0.55);
+        position: relative;
+        overflow: hidden;
+    }
+    .hero::after {
+        content: '';
+        position: absolute;
+        right: -120px; top: -120px;
+        width: 320px; height: 320px;
+        background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.18), transparent 70%);
+        pointer-events: none;
+    }
+    .hero .brand {
+        font-size: 13px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        opacity: 0.85;
+        margin-bottom: 6px;
+    }
+    .hero h1 {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 28px;
+        margin: 0;
+    }
+    .hero .month {
+        margin-top: 8px;
+        font-size: 14px;
+        opacity: 0.9;
+    }
+    .hero .firm {
+        position: absolute;
+        top: 28px; right: 32px;
+        font-size: 13px;
+        opacity: 0.85;
+        text-align: right;
+    }
+
+    /* ───── Greeting ───── */
+    .greeting {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 22px 24px;
+        margin-top: -28px;
+        position: relative;
+        z-index: 2;
+        margin-left: 24px;
+        margin-right: 24px;
+        box-shadow: 0 8px 18px -16px rgba(15, 23, 42, 0.2);
+    }
+    .greeting .label {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--soft);
+        margin-bottom: 4px;
+    }
+    .greeting .name {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 20px;
+        margin: 0;
+    }
+    .greeting p {
+        margin: 8px 0 0;
+        color: var(--muted);
+    }
+
+    /* ───── Section heading ───── */
+    h2.section {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 22px;
+        color: var(--ink);
+        margin: 38px 0 16px;
+    }
+    h2.section .accent {
+        color: var(--primary);
+    }
+
+    /* ───── KPI cards ───── */
+    .kpis {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 14px;
+    }
+    .kpi {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px 16px 14px;
+        box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+    }
+    .kpi .label {
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--soft);
+    }
+    .kpi .value {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 24px;
+        margin-top: 4px;
+        color: var(--ink);
+    }
+    .kpi .delta {
+        font-size: 12px;
+        margin-top: 2px;
+    }
+    .delta.good { color: var(--good); }
+    .delta.bad  { color: var(--bad); }
+    .delta.flat { color: var(--soft); }
+
+    /* ───── Two-column layouts ───── */
+    .two-col {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 18px;
+    }
+    @media (max-width: 880px) {
+        .two-col, .kpis { grid-template-columns: 1fr 1fr; }
+        .hero .firm { position: static; text-align: left; margin-top: 8px; }
+    }
+
+    .card {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 20px 22px;
+    }
+    .card h3 {
+        margin: 0 0 12px;
+        font-size: 14px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--soft);
+    }
+
+    /* ───── Tables ───── */
+    table.movers {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13.5px;
+    }
+    table.movers th, table.movers td {
+        text-align: left;
+        padding: 8px 6px;
+        border-bottom: 1px solid var(--line);
+    }
+    table.movers th {
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--soft);
+        font-weight: 600;
+    }
+    table.movers td.num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+    .pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .pill.good { background: #dcfce7; color: #15803d; }
+    .pill.bad  { background: #fee2e2; color: #b91c1c; }
+    .pill.warn { background: #fef3c7; color: #b45309; }
+
+    /* ───── Market context ───── */
+    .ctx-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+    }
+    .ctx-card {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px 18px;
+    }
+    .ctx-card h4 {
+        margin: 0 0 6px;
+        font-size: 13px;
+        color: var(--primary);
+        letter-spacing: 0.04em;
+    }
+    .ctx-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13.5px;
+        line-height: 1.55;
+    }
+
+    /* ───── Next-step cards ───── */
+    .next-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+    }
+    @media (max-width: 880px) { .next-grid, .ctx-grid { grid-template-columns: 1fr; } }
+    .next-card {
+        background: linear-gradient(180deg, #fff, #f8fafc);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px;
+    }
+    .next-card .ico {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        background: #eef2ff;
+        color: var(--primary);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        margin-bottom: 8px;
+    }
+    .next-card h4 {
+        margin: 0 0 4px;
+        font-size: 14.5px;
+    }
+    .next-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13.5px;
+    }
+
+    /* ───── Letter body ───── */
+    .letter {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 26px 28px;
+    }
+    .letter p {
+        margin: 0 0 12px;
+        font-size: 14.5px;
+        line-height: 1.7;
+        color: var(--ink);
+    }
+
+    /* ───── Signature ───── */
+    .signoff {
+        margin-top: 28px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+    }
+    .signoff .name {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 18px;
+        color: var(--ink);
+    }
+    .signoff .role {
+        font-size: 13px;
+        color: var(--muted);
+    }
+    .signoff .qa {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--soft);
+    }
+
+    .disclaimer {
+        margin-top: 26px;
+        padding: 14px 16px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--accent);
+        border-radius: 8px;
+        font-size: 11.5px;
+        color: var(--muted);
+        line-height: 1.55;
+    }
+
+    canvas { max-width: 100%; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+    <!-- ────── Hero ────── -->
+    <div class="hero">
+        <div class="brand">PortfolioNarrator AI · Private Wealth</div>
+        <h1>{{ month_long }} Portfolio Review</h1>
+        <div class="month">Prepared for {{ client_name }} · Ref PN/{{ month_compact }}/{{ short_id }}</div>
+        <div class="firm">{{ firm_name }}<br/>{{ generated_date_long }}</div>
+    </div>
+
+    <div class="greeting">
+        <div class="label">A note from your relationship manager</div>
+        <p class="name">Hello, {{ client_first_name }}</p>
+        <p>Here is your portfolio snapshot for {{ month_long }} — performance, the moves we made on your behalf, and our forward stance.</p>
+    </div>
+
+    <!-- ────── KPIs ────── -->
+    <h2 class="section"><span class="accent">Portfolio</span> Snapshot</h2>
+    <div class="kpis">
+        <div class="kpi">
+            <div class="label">Portfolio Value</div>
+            <div class="value">₹{{ portfolio_value_cr }} Cr</div>
+            <div class="delta flat">{{ holdings_count }} holdings</div>
+        </div>
+        <div class="kpi">
+            <div class="label">Total Return</div>
+            <div class="value">{{ portfolio_return_fmt }}</div>
+            <div class="delta {{ portfolio_return_class }}">vs. last review</div>
+        </div>
+        <div class="kpi">
+            <div class="label">Benchmark (Nifty 50)</div>
+            <div class="value">{{ nifty_return_fmt }}</div>
+            <div class="delta flat">1-month</div>
+        </div>
+        <div class="kpi">
+            <div class="label">Alpha</div>
+            <div class="value">{{ alpha_fmt }}</div>
+            <div class="delta {{ alpha_class }}">over Nifty</div>
+        </div>
+        <div class="kpi">
+            <div class="label">Risk Profile</div>
+            <div class="value" style="font-size:18px;">{{ risk_profile }}</div>
+            <div class="delta flat">Horizon: {{ horizon }}</div>
+        </div>
+    </div>
+
+    <!-- ────── Performance + allocation ────── -->
+    <h2 class="section"><span class="accent">Performance</span> Overview</h2>
+    <div class="two-col">
+        <div class="card">
+            <h3>Portfolio NAV vs. Nifty 50 — last 90 trading days</h3>
+            <canvas id="perfChart" height="220"></canvas>
+        </div>
+        <div class="card">
+            <h3>Asset Allocation</h3>
+            <canvas id="allocChart" height="220"></canvas>
+        </div>
+    </div>
+
+    <!-- ────── Movers ────── -->
+    <h2 class="section"><span class="accent">Top</span> Movers</h2>
+    <div class="two-col">
+        <div class="card">
+            <h3>Top Contributors</h3>
+            <table class="movers">
+                <thead><tr><th>Ticker</th><th>Sector</th><th class="num">Return</th></tr></thead>
+                <tbody>
+                {% for h in top_performers %}
+                    <tr>
+                        <td><strong>{{ h.ticker }}</strong></td>
+                        <td>{{ h.sector or '—' }}</td>
+                        <td class="num"><span class="pill good">+{{ '%.2f'|format(h.return_pct) }}%</span></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="3" style="color: var(--soft); padding: 14px 6px;">No data this period.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card">
+            <h3>Top Detractors</h3>
+            <table class="movers">
+                <thead><tr><th>Ticker</th><th>Sector</th><th class="num">Return</th></tr></thead>
+                <tbody>
+                {% for h in underperformers %}
+                    <tr>
+                        <td><strong>{{ h.ticker }}</strong></td>
+                        <td>{{ h.sector or '—' }}</td>
+                        <td class="num"><span class="pill bad">{{ '%.2f'|format(h.return_pct) }}%</span></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="3" style="color: var(--soft); padding: 14px 6px;">Nothing notable.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ────── Market Context ────── -->
+    <h2 class="section"><span class="accent">Market</span> Context</h2>
+    <div class="ctx-grid">
+        <div class="ctx-card">
+            <h4>Indian Markets</h4>
+            <p>{{ ctx_indian }}</p>
+        </div>
+        <div class="ctx-card">
+            <h4>Global Markets</h4>
+            <p>{{ ctx_global }}</p>
+        </div>
+        <div class="ctx-card">
+            <h4>Economy</h4>
+            <p>{{ ctx_economy }}</p>
+        </div>
+        <div class="ctx-card">
+            <h4>Outlook</h4>
+            <p>{{ ctx_outlook }}</p>
+        </div>
+    </div>
+
+    <!-- ────── What's next ────── -->
+    <h2 class="section">What's <span class="accent">Next?</span></h2>
+    <div class="next-grid">
+        {% for n in next_steps %}
+        <div class="next-card">
+            <div class="ico">{{ n.icon }}</div>
+            <h4>{{ n.title }}</h4>
+            <p>{{ n.body }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- ────── Letter prose ────── -->
+    <h2 class="section">Your RM's <span class="accent">Note</span></h2>
+    <div class="letter">
+        {{ letter_body_html|safe }}
+
+        <div class="signoff">
+            <div>
+                <div class="name">{{ rm_name }}</div>
+                <div class="role">{{ rm_designation }}, {{ firm_name }}</div>
+                {% if rm_email or rm_phone %}
+                <div class="role">
+                    {% if rm_email %}{{ rm_email }}{% endif %}
+                    {% if rm_email and rm_phone %} · {% endif %}
+                    {% if rm_phone %}{{ rm_phone }}{% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% if qa_score %}
+            <div class="qa">QA score · {{ qa_score }}/10</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="disclaimer">
+        <strong>Disclaimer.</strong> This report is prepared for the named recipient
+        only, based on data available as of {{ generated_date_long }}. Past performance
+        is not indicative of future results. Investments are subject to market risk.
+        Please consult your relationship manager before acting on anything in this note.
+        {{ firm_name }} operates under applicable SEBI norms; personal data is processed
+        in accordance with the Digital Personal Data Protection Act, 2023.
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+    // ── Inlined data from the server (no extra round-trip) ──
+    const PERF_DATA  = {{ perf_data_json|safe }};
+    const ALLOC_DATA = {{ alloc_data_json|safe }};
+
+    if (window.Chart && document.getElementById('perfChart')) {
+        new Chart(document.getElementById('perfChart'), {
+            type: 'line',
+            data: {
+                labels: PERF_DATA.labels,
+                datasets: [
+                    {
+                        label: 'Portfolio (proxy)',
+                        data: PERF_DATA.portfolio,
+                        borderColor: '#1e3a8a',
+                        backgroundColor: 'rgba(30, 58, 138, 0.08)',
+                        fill: true,
+                        tension: 0.35,
+                        borderWidth: 2.2,
+                        pointRadius: 0,
+                    },
+                    {
+                        label: 'Nifty 50',
+                        data: PERF_DATA.nifty,
+                        borderColor: '#d4af37',
+                        borderDash: [4, 4],
+                        fill: false,
+                        tension: 0.35,
+                        borderWidth: 2,
+                        pointRadius: 0,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 10 } },
+                },
+                scales: {
+                    x: { ticks: { autoSkip: true, maxTicksLimit: 6 } },
+                    y: { ticks: { callback: v => v.toFixed(0) } },
+                },
+            },
+        });
+    }
+
+    if (window.Chart && document.getElementById('allocChart')) {
+        new Chart(document.getElementById('allocChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ALLOC_DATA.labels,
+                datasets: [{
+                    data: ALLOC_DATA.values,
+                    backgroundColor: ['#1e3a8a','#3b82f6','#6366f1','#8b5cf6','#a855f7','#d4af37','#16a34a','#0ea5e9'],
+                    borderColor: '#fff',
+                    borderWidth: 2,
+                }],
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12 } },
+                },
+                cutout: '60%',
+            },
+        });
+    }
+</script>
+</body>
+</html>

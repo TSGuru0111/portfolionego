@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Download } from 'lucide-react'
+import { ArrowLeft, Download, ExternalLink } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 import Button from '../components/ui/Button.jsx'
@@ -37,8 +37,8 @@ export default function ReportPage() {
         if (meta?.qa_score != null) setQaScore(meta.qa_score)
         if (meta?.report_id) setResolvedReportId(meta.report_id)
       })
-      .catch((err) => toast.error(err.message || 'Report generation failed'))
-  }, [isNew, id, month, generateReport])
+      .catch(() => { /* hook already surfaced the toast */ })
+  }, [isNew, id, month])
 
   const downloadPdf = async () => {
     if (!resolvedReportId) {
@@ -61,6 +61,14 @@ export default function ReportPage() {
     } finally {
       setDownloading(false)
     }
+  }
+
+  const openHtmlView = () => {
+    if (!resolvedReportId) {
+      toast.error('Report has not been saved yet.')
+      return
+    }
+    window.open(api.viewHtmlUrl(resolvedReportId), '_blank', 'noopener')
   }
 
   return (
@@ -88,15 +96,25 @@ export default function ReportPage() {
           </div>
         </div>
 
-        <Button
-          variant="secondary"
-          onClick={downloadPdf}
-          loading={downloading}
-          disabled={isStreaming || !resolvedReportId}
-        >
-          <Download className="w-4 h-4 mr-1" />
-          Download PDF
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={openHtmlView}
+            disabled={isStreaming || !resolvedReportId}
+          >
+            <ExternalLink className="w-4 h-4 mr-1" />
+            View HTML report
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={downloadPdf}
+            loading={downloading}
+            disabled={isStreaming || !resolvedReportId}
+          >
+            <Download className="w-4 h-4 mr-1" />
+            Download PDF
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -106,7 +124,7 @@ export default function ReportPage() {
       )}
 
       <Card>
-        <ReportViewer text={reportText} isStreaming={isStreaming} />
+        <ReportViewer reportText={reportText} isStreaming={isStreaming} />
       </Card>
     </div>
   )

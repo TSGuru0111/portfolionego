@@ -22,6 +22,26 @@ USER_AGENT = "PortfolioNarrator/0.1 (+contact rm@wealthfirm.example)"
 REQUEST_TIMEOUT = 12  # seconds
 
 
+def _log_error_safe(job: str, exc: Exception, context: dict | None = None) -> None:
+    """Fire-and-forget error log that works from sync or async context.
+
+    The fetchers below run inside ``asyncio.to_thread`` worker threads which
+    have no running event loop, so ``asyncio.create_task`` raises
+    ``RuntimeError: no running event loop``. This helper schedules the log
+    appropriately for either context and never re-raises.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(log_error(job, exc, context or {}))
+        return
+    except RuntimeError:
+        pass
+    try:
+        asyncio.run(log_error(job, exc, context or {}))
+    except Exception:  # noqa: BLE001
+        print(f"[error_log_fail] {job}: {exc}")
+
+
 # ────────────────────────────────────────────────── config readers ──
 
 def load_feed_config() -> dict[str, Any]:
@@ -63,8 +83,7 @@ def fetch_rss(
     try:
         parsed = feedparser.parse(url, agent=USER_AGENT)
     except Exception as exc:  # noqa: BLE001
-        # log_error is async — schedule it without awaiting.
-        asyncio.create_task(log_error("rss_parse", exc, {"url": url}))
+        _log_error_safe("rss_parse", exc, {"url": url})
         return []
 
     entries = getattr(parsed, "entries", []) or []
@@ -112,7 +131,7 @@ def fetch_newsapi(query: str, limit: int = 3) -> list[dict[str, str]]:
         res.raise_for_status()
         payload = res.json()
     except Exception as exc:  # noqa: BLE001
-        asyncio.create_task(log_error("newsapi_fetch", exc, {"query": query}))
+        _log_error_safe("newsapi_fetch", exc, {"query": query})
         return []
 
     today = date.today().isoformat()
@@ -156,7 +175,7 @@ def fetch_gnews(sector: str, limit: int = 3) -> list[dict[str, str]]:
         res.raise_for_status()
         payload = res.json()
     except Exception as exc:  # noqa: BLE001
-        asyncio.create_task(log_error("gnews_fetch", exc, {"sector": sector}))
+        _log_error_safe("gnews_fetch", exc, {"sector": sector})
         return []
 
     today = date.today().isoformat()

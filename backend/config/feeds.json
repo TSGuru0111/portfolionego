@@ -2,28 +2,28 @@
   "rss": [
     {
       "id": "market_mc",
-      "label": "Moneycontrol — Markets",
+      "label": "Moneycontrol \u2014 Markets",
       "url": "https://www.moneycontrol.com/rss/marketreports.xml",
       "category": "market",
       "enabled": true
     },
     {
       "id": "market_et",
-      "label": "Economic Times — Markets",
+      "label": "Economic Times \u2014 Markets",
       "url": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
       "category": "market",
       "enabled": true
     },
     {
       "id": "economy_et",
-      "label": "Economic Times — Economy",
+      "label": "Economic Times \u2014 Economy",
       "url": "https://economictimes.indiatimes.com/news/economy/rssfeeds/20812518.cms",
       "category": "economy",
       "enabled": true
     },
     {
       "id": "rbi",
-      "label": "RBI — Press Releases",
+      "label": "RBI \u2014 Press Releases",
       "url": "https://www.rbi.org.in/feeds/pressReleases.xml",
       "category": "policy",
       "enabled": true
@@ -40,6 +40,12 @@
   },
   "gnews": {
     "enabled": true,
-    "sectors": ["technology", "banking", "pharma", "energy", "automobile"]
+    "sectors": [
+      "technology",
+      "banking",
+      "pharma",
+      "energy",
+      "automobile"
+    ]
   }
 }

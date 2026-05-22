@@ -51,8 +51,13 @@ export const api = {
 
   /**
    * Streaming report generation.
-   * Caller passes onChunk(textDelta) — invoked for every streamed chunk.
-   * Returns the final concatenated text once the stream closes.
+   *
+   * Server appends a JSON meta trailer of the form
+   *   \n\n[[META]]{"report_id":"...","qa_score":8}[[END]]
+   * which we strip out of the visible stream and parse for the caller.
+   *
+   * Caller passes onChunk(textDelta) for live rendering.
+   * Returns { text, report_id, qa_score } after the stream closes.
    */
   generateReportStream: async ({ clientId, month, onChunk }) => {
     const headers = await authHeader()
@@ -71,18 +76,64 @@ export const api = {
       throw new Error(detail)
     }
 
-    const reader  = res.body.getReader()
+    const reader = res.body.getReader()
     const decoder = new TextDecoder()
+    const META = '[[META]]'
+    const END = '[[END]]'
+
     let full = ''
-    // eslint-disable-next-line no-constant-condition
+    let emitted = 0
+    let metaReached = false
+
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      const chunk = decoder.decode(value, { stream: true })
-      full += chunk
-      onChunk?.(chunk)
+      full += decoder.decode(value, { stream: true })
+
+      const metaIdx = full.indexOf(META)
+      if (metaIdx !== -1) {
+        if (metaIdx > emitted) {
+          onChunk?.(full.slice(emitted, metaIdx))
+          emitted = metaIdx
+        }
+        metaReached = true
+        if (full.indexOf(END, metaIdx) !== -1) break
+      } else {
+        // Hold back the last 10 chars in case the marker is being split
+        // across two TCP frames.
+        const safeEnd = Math.max(emitted, full.length - META.length)
+        if (safeEnd > emitted) {
+          onChunk?.(full.slice(emitted, safeEnd))
+          emitted = safeEnd
+        }
+      }
     }
-    return full
+
+    // Flush any pending visible tail if no meta arrived.
+    const metaIdx = full.indexOf(META)
+    if (metaIdx === -1 && emitted < full.length) {
+      onChunk?.(full.slice(emitted))
+      emitted = full.length
+    }
+
+    let meta = {}
+    let text = full
+    if (metaIdx !== -1) {
+      const endIdx = full.indexOf(END, metaIdx)
+      const jsonStr = full.slice(
+        metaIdx + META.length,
+        endIdx === -1 ? undefined : endIdx,
+      )
+      try { meta = JSON.parse(jsonStr) } catch { /* ignore */ }
+      text = full.slice(0, metaIdx).replace(/\s+$/, '')
+    }
+
+    return {
+      text,
+      report_id: meta.report_id ?? null,
+      qa_score: meta.qa_score ?? null,
+      _metaReached: metaReached,
+    }
   },
 
   exportPdf: async (reportId) => {
@@ -94,6 +145,11 @@ export const api = {
     if (!res.ok) throw new Error('PDF download failed')
     return res.blob()
   },
+
+  // Opens the rich HTML report card in a new tab. Built as a URL helper
+  // because the endpoint returns text/html and is meant to be navigated
+  // to, not fetched.
+  viewHtmlUrl: (reportId) => `${API}/reports/${reportId}/view-html`,
 
   // ─── Admin ───
   triggerNewsCollection: async (secret) => {

@@ -608,7 +608,7 @@ values (<rm_id>, 'Vikram Shah', 8.00, 'aggressive',
 
 ---
 
-### Day 6 — Report Generation Endpoint + Full Pipeline
+### Day 6 — Report Generation Endpoint + Full Pipeline + Rich HTML View
 
 **You:**
 - [ ] Create `services/report_generator.py` — full two-call pipeline:
@@ -616,46 +616,72 @@ values (<rm_id>, 'Vikram Shah', 8.00, 'aggressive',
   2. `build_prompt_safe(context)` → estimate tokens → trim if needed
   3. Cohere `chat_stream()` → `command-r-plus-08-2024` → stream tokens
   4. After stream completes → `run_qa_check(full_text)` → score 1–10
-  5. If score < 7 → `regenerate_strict(context)` → replace text
+  5. If score < 7 → `regenerate_strict(context, note)` → replace text
   6. `save_report(client_id, month, text, score)`
-- [ ] Create `services/translator.py` — Hindi two-step pipeline:
-  - Generate English letter first (already done in step above)
-  - Second Cohere call: translate with HINDI_HEADERS mapping
-  - formal Aap, numbers in English, stock names in English
+  7. Append a JSON meta trailer (`[[META]]{...}[[END]]`) to the stream so
+     the frontend learns `report_id` + `qa_score` without a second call.
+- [ ] **NEW: Rich HTML report view (in addition to the plain-text PDF).**
+  - `static/templates/letter_card.html` — visual report card mirroring
+    the PortfolioNarrator AI design:
+    * Header band with firm logo + RM name + month tag
+    * Personalised greeting block
+    * **Portfolio Snapshot** — 5 KPI cards (Portfolio Value ₹ Cr,
+      Total Return %, Benchmark Return %, Alpha %, Risk Profile)
+    * **Performance Overview** — Chart.js line chart of the last 90
+      trading days (portfolio NAV proxy vs. Nifty 50)
+    * **Asset Allocation** — Chart.js doughnut by sector
+    * **Top Contributors / Top Detractors** — two side-by-side tables
+      derived from `top_performers` / `underperformers`
+    * **Market Context** — 4 cards (Indian Markets, Global Markets,
+      Economy, Outlook) populated from `weekly_summaries` + `macro`
+    * **What's Next?** — 3 recommendation cards parsed from the
+      letter's forward-view paragraph + house view
+    * RM signature + contact + small QR linking back to the SaaS
+  - `services/html_renderer.py` — Jinja2 renders the card against the
+    saved report row + a fresh `build_context_packet` call. Returns a
+    single self-contained HTML string (Chart.js via CDN, inline JSON
+    data), safe to email or embed in an `<iframe>`.
+  - New endpoint `GET /reports/{id}/view-html` → returns
+    `text/html; charset=utf-8`. Used by the frontend "View HTML report"
+    button.
+- [ ] ~~Create `services/translator.py` — Hindi two-step pipeline~~
+  **(DEFERRED — English only for v1 per product decision.)**
 - [ ] Create `routes/reports.py`:
   - `POST /reports/generate-stream` → StreamingResponse
-  - `GET /reports` → list reports for client
-  - `POST /reports/{id}/translate` → Hindi translation
+  - `GET /reports?client_id=...` → list reports for client
+  - `GET /reports/{id}` → fetch one
   - `GET /reports/{id}/export-pdf` → PDF download
+  - `GET /reports/{id}/view-html` → rich HTML report card
 - [ ] Test: hit generate endpoint for all 5 clients — verify streaming works
-- [ ] Test: QA check fires after stream — score returned
+- [ ] Test: QA check fires after stream — score returned in meta trailer
 - [ ] Test: score < 7 triggers regeneration (manually set threshold to 9 temporarily)
-- [ ] Test: Hindi translation for Sunita Rao — verify headers in Hindi
+- [ ] Test: open `view-html` URL in browser — chart renders, numbers tally
 
 **Dev 2:**
 - [ ] Wire `GET /reports/{id}/export-pdf` to pdf_exporter
 - [ ] Test PDF download from browser — file opens correctly
-- [ ] Add `GET /admin/trigger-all-reports` endpoint
+- [ ] Add `POST /admin/trigger-all-reports` endpoint
 - [ ] Add EasyCron job: `GET /jobs/generate-monthly` endpoint
 
 **Dev 3:**
 - [ ] Wire Generate Report button → `POST /reports/generate-stream`
-- [ ] Connect `useStreamReport` hook to button + ReportViewer
-- [ ] Build `components/report/LanguageToggle.jsx`:
-  - Toggle button: EN | HI
-  - Calls `POST /reports/{id}/translate` on Hindi click
-  - Shows spinner + "Generating Hindi version..." during translation
+- [ ] Connect `useStreamReport` hook → strip `[[META]]…[[END]]` trailer
+      and surface `report_id` + `qa_score` to the caller
+- [ ] Add **"View HTML report"** button on `ReportPage.jsx` that opens
+      `GET /reports/{id}/view-html` in a new tab
 - [ ] Build Download PDF button:
   - Calls `GET /reports/{id}/export-pdf`
   - Triggers browser file download
 - [ ] Build `components/report/QAScoreBadge.jsx`:
   - Shows score after generation (small badge)
   - Green if ≥ 8, yellow if 7, orange if < 7
+- [ ] ~~`components/report/LanguageToggle.jsx`~~ **(DEFERRED with Hindi.)**
 
 **End of Day 6 check:**
-- Full flow: generate → stream → view → download PDF ✅
+- Full flow: generate → stream → view (text + rich HTML) → download PDF ✅
 - QA check fires and scores correctly ✅
-- Hindi translation works for Sunita Rao ✅
+- HTML report card renders with live charts + numbers ✅
+- Hindi translation deferred — flag visible in code but no UI ⏸
 - PDF downloads with professional layout ✅
 
 ---

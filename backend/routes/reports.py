@@ -7,21 +7,42 @@ Day 6: generate-stream (Cohere streaming + QA + save) is wired in
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 
 from db import reports_db
 from models.report import GenerateReportRequest
-from services import pdf_exporter
+from services import html_renderer, pdf_exporter, report_generator
+from services.context_builder import build_context_packet
 
 router = APIRouter()
 
 
 @router.post("/generate-stream")
-async def generate_report(request: GenerateReportRequest) -> dict:
-    """TODO(Day 6): StreamingResponse → Cohere streaming pipeline."""
-    raise HTTPException(
-        status_code=501,
-        detail="reports.generate_report — Day 6",
+async def generate_report(request: GenerateReportRequest) -> StreamingResponse:
+    """Cohere streaming → letter chunks → QA → save → meta trailer.
+
+    Response body is ``text/plain``; the frontend strips the trailing
+    ``[[META]]{...}[[END]]`` block to learn ``report_id`` + ``qa_score``.
+    """
+    try:
+        context = await build_context_packet(request.client_id, request.month)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    async def _body():
+        async for chunk in report_generator.generate_report_stream(
+            client_id=request.client_id,
+            month=request.month,
+            context=context,
+        ):
+            yield chunk
+
+    return StreamingResponse(
+        _body(),
+        media_type="text/plain; charset=utf-8",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-store"},
     )
 
 
@@ -44,6 +65,26 @@ async def get_report_row(report_id: str) -> dict:
     if not row:
         raise HTTPException(status_code=404, detail="Report not found")
     return row
+
+
+@router.get("/{report_id}/view-html")
+async def view_html(report_id: str) -> Response:
+    """Rich HTML report card — visual dashboard view of one saved report."""
+    try:
+        row = await reports_db.get_report(report_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    try:
+        html = await html_renderer.render_report_card(row)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"HTML render failed: {exc}") from exc
+
+    return Response(content=html, media_type="text/html; charset=utf-8")
 
 
 @router.get("/{report_id}/export-pdf")
