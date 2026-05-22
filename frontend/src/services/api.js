@@ -49,6 +49,13 @@ export const api = {
     )
   },
 
+  getReport: async (reportId) => {
+    const headers = await authHeader()
+    return jsonOrThrow(
+      await fetch(`${API}/reports/${reportId}`, { headers }),
+    )
+  },
+
   /**
    * Streaming report generation.
    *
@@ -183,6 +190,14 @@ export const api = {
     return jsonOrThrow(
       await fetch(
         `${API}/admin/errors?secret=${encodeURIComponent(secret)}&limit=20`,
+      ),
+    )
+  },
+
+  getJobRuns: async (secret) => {
+    return jsonOrThrow(
+      await fetch(
+        `${API}/admin/job-runs?secret=${encodeURIComponent(secret)}&limit=10`,
       ),
     )
   },

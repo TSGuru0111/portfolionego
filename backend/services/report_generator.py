@@ -16,8 +16,9 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import random
 import re
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Callable, TypeVar
 
 import cohere
 
@@ -28,10 +29,44 @@ from services.error_logger import log_error
 GENERATION_MODEL = "command-r-plus-08-2024"
 QA_MODEL = "command-r-08-2024"
 QA_THRESHOLD = 7
+COHERE_REQUEST_TIMEOUT = 45  # seconds
+COHERE_MAX_ATTEMPTS = 3
 
 # Meta trailer sentinels — chosen to be very unlikely in real letter text.
 META_OPEN = "\n\n[[META]]"
 META_CLOSE = "[[END]]"
+
+T = TypeVar("T")
+
+
+async def _with_retry(
+    label: str,
+    fn: Callable[[], T],
+    attempts: int = COHERE_MAX_ATTEMPTS,
+) -> T:
+    """Run ``fn()`` in a thread with exponential-backoff retries.
+
+    Handles Cohere SDK transients (timeouts, rate limits, 5xx). Last
+    attempt's exception is re-raised so the caller can degrade gracefully.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            return await asyncio.to_thread(fn)
+        except Exception as exc:  # noqa: BLE001 — Cohere SDK throws subclasses
+            last_exc = exc
+            if attempt == attempts - 1:
+                break
+            # 1s, 2s, 4s with small jitter — keeps total backoff < 10s.
+            backoff = (2 ** attempt) + random.uniform(0, 0.5)
+            await log_error(
+                f"{label}.retry",
+                exc,
+                {"attempt": attempt + 1, "sleep": round(backoff, 2)},
+            )
+            await asyncio.sleep(backoff)
+    assert last_exc is not None  # for type-checkers
+    raise last_exc
 
 _QA_PROMPT = (
     "You are a strict QA reviewer for an Indian wealth-management RM "
@@ -87,7 +122,9 @@ async def run_qa_check(letter_text: str) -> int:
     if client is None or not letter_text.strip():
         return 0
     try:
-        return await asyncio.to_thread(_qa_blocking, client, letter_text)
+        return await _with_retry(
+            "qa_check", lambda: _qa_blocking(client, letter_text)
+        )
     except Exception as exc:  # noqa: BLE001
         await log_error("qa_check", exc)
         return 0
@@ -119,7 +156,76 @@ async def regenerate_strict(
         "sentences."
     )
     prompt = prompt_builder.build_strict_prompt(context, note=note)
-    return await asyncio.to_thread(_regen_blocking, client, prompt)
+    return await _with_retry(
+        "regenerate_strict", lambda: _regen_blocking(client, prompt)
+    )
+
+
+# ──────────────────────────────────────────────── batch (non-streamed) ──
+
+async def generate_report_batch(
+    client_id: str,
+    month: str,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    """Non-streamed variant for admin/cron — same QA + regen + save path.
+
+    Returns ``{client_id, month, report_id, qa_score, status, detail}``.
+    Never raises — degrades to ``status: 'error'`` so a multi-client loop
+    can continue.
+    """
+    client = _cohere_client()
+    if client is None:
+        return {
+            "client_id": client_id,
+            "month": month,
+            "status": "error",
+            "detail": "no_api_key",
+        }
+
+    try:
+        prompt = prompt_builder.build_prompt_safe(context, strict=False)
+        first_draft = await _with_retry(
+            "batch.generate", lambda: _regen_blocking(client, prompt)
+        )
+        text = (first_draft or "").strip()
+        qa_score = await run_qa_check(text) if text else 0
+
+        if text and qa_score and qa_score < QA_THRESHOLD:
+            redraft = await regenerate_strict(context, qa_score)
+            if redraft:
+                text = redraft
+                qa_score = await run_qa_check(text)
+
+        report_id: str | None = None
+        if text:
+            try:
+                report_id = await reports_db.save_report(
+                    client_id=client_id,
+                    month=month,
+                    generated_text=text,
+                    qa_score=qa_score,
+                )
+            except Exception as exc:  # noqa: BLE001
+                await log_error(
+                    "batch.save", exc, {"client_id": client_id}
+                )
+
+        return {
+            "client_id": client_id,
+            "month": month,
+            "report_id": report_id,
+            "qa_score": qa_score,
+            "status": "ok" if text else "empty",
+        }
+    except Exception as exc:  # noqa: BLE001
+        await log_error("batch.generate", exc, {"client_id": client_id})
+        return {
+            "client_id": client_id,
+            "month": month,
+            "status": "error",
+            "detail": str(exc),
+        }
 
 
 # ──────────────────────────────────────────────── streaming ──

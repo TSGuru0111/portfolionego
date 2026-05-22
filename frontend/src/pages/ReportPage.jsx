@@ -29,6 +29,7 @@ export default function ReportPage() {
     isNew ? null : reportId,
   )
   const [downloading, setDownloading] = useState(false)
+  const [savedText, setSavedText] = useState('')
 
   useEffect(() => {
     if (!isNew) return
@@ -39,6 +40,23 @@ export default function ReportPage() {
       })
       .catch(() => { /* hook already surfaced the toast */ })
   }, [isNew, id, month])
+
+  // When viewing a saved report, fetch the persisted text instead of
+  // re-streaming through Cohere.
+  useEffect(() => {
+    if (isNew || !reportId) return
+    let cancelled = false
+    api.getReport(reportId)
+      .then((row) => {
+        if (cancelled || !row) return
+        setSavedText(row.generated_text || '')
+        if (row.qa_score != null) setQaScore(row.qa_score)
+      })
+      .catch(() => { /* surfaced below via error message */ })
+    return () => { cancelled = true }
+  }, [isNew, reportId])
+
+  const displayText = isNew ? reportText : savedText
 
   const downloadPdf = async () => {
     if (!resolvedReportId) {
@@ -124,7 +142,7 @@ export default function ReportPage() {
       )}
 
       <Card>
-        <ReportViewer reportText={reportText} isStreaming={isStreaming} />
+        <ReportViewer reportText={displayText} isStreaming={isStreaming} />
       </Card>
     </div>
   )

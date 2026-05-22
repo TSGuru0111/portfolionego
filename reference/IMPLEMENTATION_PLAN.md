@@ -3,6 +3,12 @@
 **Team:** You (AI + Full-stack) · Dev 2 (Backend + DB) · Dev 3 (Frontend + UI)
 **Goal:** Live demo-ready app in 14 days
 
+> **Build status (May 2026):** all code-level deliverables for Days 1–14
+> are landed on `main`. The remaining work is operational only —
+> creating the EasyCron jobs, deploying to Render + Vercel, running the
+> live demo rehearsal, and exporting the pitch deck. See the per-day
+> sections below for the granular checklist.
+
 ---
 
 ## What Changed in v2.0

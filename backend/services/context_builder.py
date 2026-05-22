@@ -18,7 +18,47 @@ on Day 5 and ``services.report_generator.generate_report`` on Day 6.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
+
+_TAG_RE = re.compile(r"<[^>]+>")
+_MEETING_NOTES_CAP = 500
+_RATIONALE_CAP = 400
+
+
+def _strip_tags(text: str) -> str:
+    """Remove any HTML tags from free-form text fields before prompt use."""
+    if not text:
+        return ""
+    return _TAG_RE.sub("", str(text))
+
+
+def _sanitise_client(client: dict[str, Any]) -> dict[str, Any]:
+    """Strip HTML and cap free-form fields that get serialised into prompts."""
+    out = dict(client)
+    notes = (client.get("last_meeting_notes") or "").strip()
+    if notes:
+        notes = _strip_tags(notes)
+        if len(notes) > _MEETING_NOTES_CAP:
+            notes = notes[:_MEETING_NOTES_CAP].rstrip() + "…"
+        out["last_meeting_notes"] = notes
+    return out
+
+
+def _sanitise_transactions(
+    transactions: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    cleaned: list[dict[str, Any]] = []
+    for t in transactions:
+        row = dict(t)
+        r = (row.get("rationale") or "").strip()
+        if r:
+            r = _strip_tags(r)
+            if len(r) > _RATIONALE_CAP:
+                r = r[:_RATIONALE_CAP].rstrip() + "…"
+            row["rationale"] = r
+        cleaned.append(row)
+    return cleaned
 
 from db import clients_db, news_db
 from services.market_data import (
@@ -195,10 +235,11 @@ async def build_context_packet(
     transactions = await clients_db.get_transactions(
         client_id, limit=TRANSACTION_LOOKBACK
     )
+    transactions = _sanitise_transactions(transactions)
     rationale_trades = _extract_rationale_trades(transactions)
 
     packet: dict[str, Any] = {
-        "client": client,
+        "client": _sanitise_client(client),
         "portfolio": {k: v for k, v in portfolio_row.items() if k != "holdings"},
         "holdings": enriched_holdings,
         "portfolio_return": portfolio_return,

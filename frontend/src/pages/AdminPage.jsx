@@ -1,5 +1,6 @@
 import TriggerPanel from '../components/admin/TriggerPanel.jsx'
 import ErrorLogTable from '../components/admin/ErrorLogTable.jsx'
+import JobRunsTable from '../components/admin/JobRunsTable.jsx'
 
 export default function AdminPage() {
   return (
@@ -15,6 +16,8 @@ export default function AdminPage() {
         <TriggerPanel />
         <ErrorLogTable />
       </div>
+
+      <JobRunsTable />
     </div>
   )
 }

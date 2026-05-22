@@ -10,6 +10,7 @@ import Spinner from '../components/ui/Spinner.jsx'
 import HoldingsTable from '../components/client/HoldingsTable.jsx'
 import ReturnSummary from '../components/client/ReturnSummary.jsx'
 import SectorChart from '../components/client/SectorChart.jsx'
+import PastReportsList from '../components/report/PastReportsList.jsx'
 import { formatCr, formatDateIN } from '../utils/formatters.js'
 import { RISK_LABELS } from '../utils/constants.js'
 import { usePortfolio } from '../hooks/usePortfolio.js'
@@ -129,6 +130,7 @@ export default function ClientDetail() {
             </h2>
             <SectorChart holdings={holdings} />
           </Card>
+          <PastReportsList clientId={id} />
         </div>
       </div>
     </div>
