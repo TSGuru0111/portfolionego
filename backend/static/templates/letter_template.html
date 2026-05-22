@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>{{ client_name }} — Portfolio Review, {{ month_long }}</title>
+<style>
+    /* Local fonts — never CDN — WeasyPrint requires file:// */
+    @font-face {
+        font-family: 'Inter';
+        src: url('file://{{ font_dir }}/Inter-Regular.ttf') format('truetype');
+        font-weight: 400;
+    }
+    @font-face {
+        font-family: 'Inter';
+        src: url('file://{{ font_dir }}/Inter-Bold.ttf') format('truetype');
+        font-weight: 700;
+    }
+    @font-face {
+        font-family: 'Playfair Display';
+        src: url('file://{{ font_dir }}/PlayfairDisplay-Bold.ttf') format('truetype');
+        font-weight: 700;
+    }
+
+    @page {
+        size: A4;
+        margin: 22mm 20mm 28mm 20mm;
+        @bottom-center {
+            content: "PortfolioNarrator  ·  {{ firm_name }}  ·  Page " counter(page) " of " counter(pages);
+            font-family: 'Inter', sans-serif;
+            font-size: 9pt;
+            color: #64748b;
+        }
+    }
+
+    body {
+        font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+        font-size: 11pt;
+        color: #0f172a;
+        line-height: 1.65;
+        margin: 0;
+    }
+
+    .letterhead {
+        border-bottom: 2px solid #1e3a8a;
+        padding-bottom: 14px;
+        margin-bottom: 26px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+    }
+    .letterhead .firm {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 22pt;
+        color: #1e3a8a;
+        margin: 0;
+    }
+    .letterhead .meta {
+        font-size: 9.5pt;
+        color: #475569;
+        text-align: right;
+    }
+
+    .recipient {
+        margin-bottom: 22px;
+        font-size: 11pt;
+        color: #1e293b;
+    }
+    .recipient .label {
+        color: #64748b;
+        font-size: 9pt;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    h1.report-title {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 18pt;
+        color: #0f172a;
+        margin: 6px 0 18px;
+    }
+
+    .letter-body p {
+        margin: 0 0 12pt;
+        text-align: justify;
+        hyphens: auto;
+    }
+
+    .letter-body h2 {
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        font-size: 11.5pt;
+        color: #1e3a8a;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin: 22pt 0 6pt;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 3pt;
+    }
+
+    .signature {
+        margin-top: 32pt;
+    }
+    .signature .name {
+        font-weight: 700;
+        font-size: 11.5pt;
+    }
+    .signature .role,
+    .signature .contact {
+        font-size: 9.5pt;
+        color: #475569;
+    }
+
+    .disclaimer {
+        margin-top: 28pt;
+        padding: 10pt 12pt;
+        background: #f8fafc;
+        border-left: 3px solid #d4af37;
+        font-size: 8.5pt;
+        color: #475569;
+        line-height: 1.5;
+    }
+</style>
+</head>
+<body>
+
+<div class="letterhead">
+    <div>
+        <p class="firm">{{ firm_name }}</p>
+        <p style="font-size:9pt; color:#64748b; margin:2px 0 0;">
+            Private Wealth · Portfolio Review
+        </p>
+    </div>
+    <div class="meta">
+        <div>{{ generated_date_long }}</div>
+        <div>Ref: PN/{{ month_compact }}/{{ short_id }}</div>
+    </div>
+</div>
+
+<div class="recipient">
+    <div class="label">Prepared for</div>
+    <div><strong>{{ client_name }}</strong></div>
+    {% if client_pan_last4 %}
+    <div style="font-size:9.5pt; color:#64748b;">PAN: XXXXX{{ client_pan_last4 }}</div>
+    {% endif %}
+</div>
+
+<h1 class="report-title">Portfolio Review — {{ month_long }}</h1>
+
+<div class="letter-body">
+    {{ letter_body_html|safe }}
+</div>
+
+<div class="signature">
+    <div class="name">{{ rm_name }}</div>
+    <div class="role">{{ rm_designation }}, {{ firm_name }}</div>
+    {% if rm_email or rm_phone %}
+    <div class="contact">
+        {% if rm_email %}{{ rm_email }}{% endif %}
+        {% if rm_email and rm_phone %} · {% endif %}
+        {% if rm_phone %}{{ rm_phone }}{% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<div class="disclaimer">
+    <strong>Disclaimer:</strong>
+    The information in this letter is prepared for the named recipient
+    only and is based on portfolio data and market information available
+    as of {{ generated_date_long }}. Past performance is not indicative
+    of future results. Investments are subject to market risk. Please
+    consult your relationship manager before acting on any information
+    contained here. {{ firm_name }} is regulated under applicable SEBI
+    norms. Data is processed in accordance with the Digital Personal
+    Data Protection Act, 2023.
+</div>
+
+</body>
+</html>

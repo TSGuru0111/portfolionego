@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: portfolionarrator-backend
+    env: python
+    plan: free
+    buildCommand: |
+      apt-get update &&
+      apt-get install -y \
+        libpango-1.0-0 \
+        libpangocairo-1.0-0 \
+        libcairo2 \
+        libffi-dev \
+        shared-mime-info &&
+      pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: COHERE_API_KEY
+        sync: false
+      - key: NEWSAPI_KEY
+        sync: false
+      - key: GNEWS_API_KEY
+        sync: false
+      - key: JOB_SECRET
+        sync: false
+      - key: ADMIN_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false

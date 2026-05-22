@@ -1,0 +1,45 @@
+{
+  "rss": [
+    {
+      "id": "market_mc",
+      "label": "Moneycontrol — Markets",
+      "url": "https://www.moneycontrol.com/rss/marketreports.xml",
+      "category": "market",
+      "enabled": true
+    },
+    {
+      "id": "market_et",
+      "label": "Economic Times — Markets",
+      "url": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
+      "category": "market",
+      "enabled": true
+    },
+    {
+      "id": "economy_et",
+      "label": "Economic Times — Economy",
+      "url": "https://economictimes.indiatimes.com/news/economy/rssfeeds/20812518.cms",
+      "category": "economy",
+      "enabled": true
+    },
+    {
+      "id": "rbi",
+      "label": "RBI — Press Releases",
+      "url": "https://www.rbi.org.in/feeds/pressReleases.xml",
+      "category": "policy",
+      "enabled": true
+    }
+  ],
+  "newsapi": {
+    "enabled": true,
+    "queries": [
+      "Indian stock market",
+      "Nifty 50",
+      "RBI monetary policy"
+    ],
+    "language": "en"
+  },
+  "gnews": {
+    "enabled": true,
+    "sectors": ["technology", "banking", "pharma", "energy", "automobile"]
+  }
+}
