@@ -43,6 +43,19 @@ async def save_daily_news(headlines: list[dict[str, Any]]) -> int:
     return len(res.data or [])
 
 
+async def get_daily_news_since(start_date: str) -> list[dict[str, Any]]:
+    """Return every ``daily_news`` row with ``date >= start_date``."""
+    supabase = _require_supabase()
+    res = (
+        supabase.table("daily_news")
+        .select("id, date, category, headline, summary, source")
+        .gte("date", start_date)
+        .order("date", desc=True)
+        .execute()
+    )
+    return res.data or []
+
+
 async def get_recent_weekly_summaries(weeks: int = 4) -> list[dict[str, Any]]:
     """Return the last ``weeks`` summaries, most recent first."""
     supabase = _require_supabase()

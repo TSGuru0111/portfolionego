@@ -13,6 +13,7 @@ from db.news_db import save_daily_news
 from db.supabase_client import get_supabase
 from services.error_logger import log_error
 from services.news_fetcher import collect_daily_news
+from services.summariser import weekly_summarisation
 
 router = APIRouter()
 
@@ -87,8 +88,20 @@ async def trigger_news(secret: str = Query(...)) -> dict:
 
 @router.post("/trigger-weekly-summary")
 async def trigger_weekly(secret: str = Query(...)) -> dict:
+    """Manual run of the weekly news summariser."""
     _verify_admin_secret(secret)
-    raise HTTPException(status_code=501, detail="admin.trigger_weekly — Day 8")
+    try:
+        result = await weekly_summarisation()
+        await log_job_run(
+            "admin_trigger_weekly",
+            status="success" if result.get("status") == "ok" else "skipped",
+            records=result.get("categories", 0),
+        )
+        return result
+    except Exception as exc:  # noqa: BLE001
+        await log_error("admin_trigger_weekly", exc)
+        await log_job_run("admin_trigger_weekly", status="error")
+        raise HTTPException(500, str(exc)) from exc
 
 
 @router.post("/trigger-all-reports")
