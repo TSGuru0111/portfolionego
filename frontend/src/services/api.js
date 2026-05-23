@@ -56,6 +56,24 @@ export const api = {
     )
   },
 
+  getReportData: async (reportId) => {
+    const headers = await authHeader()
+    return jsonOrThrow(
+      await fetch(`${API}/reports/${reportId}/data`, { headers }),
+    )
+  },
+
+  updateReport: async (reportId, { generated_text }) => {
+    const headers = await authHeader()
+    return jsonOrThrow(
+      await fetch(`${API}/reports/${reportId}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generated_text }),
+      }),
+    )
+  },
+
   /**
    * Streaming report generation.
    *
@@ -63,7 +81,14 @@ export const api = {
    *   \n\n[[META]]{"report_id":"...","qa_score":8}[[END]]
    * which we strip out of the visible stream and parse for the caller.
    *
-   * Caller passes onChunk(textDelta) for live rendering.
+   * Chunk handling: we keep a local accumulator string, and on every
+   * frame we emit ONLY the new bytes since the previous emit — never
+   * the whole accumulator. This avoids the duplication bug where the
+   * caller's setState was reseeing earlier text on every chunk.
+   *
+   * Caller passes onChunk(textDelta) for live rendering. The delta
+   * should be appended with functional setState: setText(p => p + d).
+   *
    * Returns { text, report_id, qa_score } after the stream closes.
    */
   generateReportStream: async ({ clientId, month, onChunk }) => {
@@ -86,11 +111,9 @@ export const api = {
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
     const META = '[[META]]'
-    const END = '[[END]]'
 
-    let full = ''
-    let emitted = 0
-    let metaReached = false
+    let full = ''      // entire stream so far
+    let emitted = 0    // index up to which we've already called onChunk
 
     while (true) {
       const { done, value } = await reader.read()
@@ -99,47 +122,46 @@ export const api = {
 
       const metaIdx = full.indexOf(META)
       if (metaIdx !== -1) {
+        // Stop emitting at META; keep reading until [[END]] for safety.
         if (metaIdx > emitted) {
           onChunk?.(full.slice(emitted, metaIdx))
           emitted = metaIdx
         }
-        metaReached = true
-        if (full.indexOf(END, metaIdx) !== -1) break
-      } else {
-        // Hold back the last 10 chars in case the marker is being split
-        // across two TCP frames.
-        const safeEnd = Math.max(emitted, full.length - META.length)
-        if (safeEnd > emitted) {
-          onChunk?.(full.slice(emitted, safeEnd))
-          emitted = safeEnd
-        }
+        continue
+      }
+
+      // No META in buffer — emit everything except the last (META.length - 1)
+      // chars, in case "[[META]]" is split across two frames.
+      const safeEnd = full.length - (META.length - 1)
+      if (safeEnd > emitted) {
+        onChunk?.(full.slice(emitted, safeEnd))
+        emitted = safeEnd
       }
     }
 
-    // Flush any pending visible tail if no meta arrived.
+    // Final flush: parse META, emit any visible tail before it.
     const metaIdx = full.indexOf(META)
-    if (metaIdx === -1 && emitted < full.length) {
-      onChunk?.(full.slice(emitted))
-      emitted = full.length
-    }
-
-    let meta = {}
     let text = full
+    let meta = {}
     if (metaIdx !== -1) {
-      const endIdx = full.indexOf(END, metaIdx)
+      if (metaIdx > emitted) {
+        onChunk?.(full.slice(emitted, metaIdx))
+      }
+      const endIdx = full.indexOf('[[END]]', metaIdx)
       const jsonStr = full.slice(
         metaIdx + META.length,
         endIdx === -1 ? undefined : endIdx,
       )
       try { meta = JSON.parse(jsonStr) } catch { /* ignore */ }
       text = full.slice(0, metaIdx).replace(/\s+$/, '')
+    } else if (full.length > emitted) {
+      onChunk?.(full.slice(emitted))
     }
 
     return {
       text,
       report_id: meta.report_id ?? null,
       qa_score: meta.qa_score ?? null,
-      _metaReached: metaReached,
     }
   },
 
