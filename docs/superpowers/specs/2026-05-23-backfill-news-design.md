@@ -61,8 +61,10 @@ Script prepends the project root to `sys.path` at startup so `backend.*` imports
 ### Phase 1 — Daily News Backfill
 
 ```
+# Hardcoded at top of script. Mirrors backend/config/feeds.json at time of
+# writing. Acceptable drift since backfill is a one-off tool — if feeds.json
+# changes meaningfully later, edit this list and re-run.
 queries = ["Indian stock market", "Nifty 50", "RBI monetary policy"]
-# reused from backend/config/feeds.json
 
 For each query:
   GET https://newsapi.org/v2/everything
@@ -118,6 +120,10 @@ For week_offset in [0, 1, 2, 3]:
 
 Mirrors `summariser.weekly_summarisation()` at `backend/services/summariser.py:132` — same Cohere model (`command-r`), same prompt template, same banned-phrase strip.
 
+**Week window semantics:** Windows are `[week_start, week_end]` inclusive on both ends, matching the existing summariser. Consecutive weeks share their boundary day (e.g., 2026-05-16 appears in both the 5/9–5/16 and 5/16–5/23 windows). This is the existing production behavior — accepted as-is to avoid divergence. A headline on a boundary day will appear in two summaries; this is harmless context redundancy, not a bug.
+
+**Categories from NewsAPI:** All NewsAPI rows use `category="newsapi"` (matching `news_fetcher.py:148`), so each backfilled week will have a single category bucket. This is consistent with what the production cron produces when only NewsAPI ran that week.
+
 ### Logging Format
 
 ```
@@ -126,10 +132,10 @@ Mirrors `summariser.weekly_summarisation()` at `backend/services/summariser.py:1
 [1/2] Fetching NewsAPI for "RBI monetary policy"... 41 articles
 [1/2] Deduped to 198 unique rows
 [1/2] Skipped 0 existing dates, inserting 198 rows... done
-[2/2] Week 2026-05-16 to 2026-05-23: 3 categories, generating summaries... done
-[2/2] Week 2026-05-09 to 2026-05-16: 3 categories, generating summaries... done
-[2/2] Week 2026-05-02 to 2026-05-09: 3 categories, generating summaries... done
-[2/2] Week 2026-04-25 to 2026-05-02: 3 categories, generating summaries... done
+[2/2] Week 2026-05-16 to 2026-05-23: 1 category (newsapi), generating summary... done
+[2/2] Week 2026-05-09 to 2026-05-16: 1 category (newsapi), generating summary... done
+[2/2] Week 2026-05-02 to 2026-05-09: 1 category (newsapi), generating summary... done
+[2/2] Week 2026-04-25 to 2026-05-02: 1 category (newsapi), generating summary... done
 Done. 198 daily_news rows, 4 weekly_summaries rows.
 ```
 
