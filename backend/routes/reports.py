@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
+from pydantic import BaseModel, Field
 
 from db import reports_db
 from models.report import GenerateReportRequest
@@ -15,6 +16,10 @@ from services import html_renderer, pdf_exporter, report_generator
 from services.context_builder import build_context_packet
 
 router = APIRouter()
+
+
+class UpdateReportBody(BaseModel):
+    generated_text: str = Field(..., min_length=1)
 
 
 @router.post("/generate-stream")
@@ -116,3 +121,24 @@ async def export_pdf(report_id: str, lang: str = "english") -> Response:
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.patch("/{report_id}")
+async def patch_report(report_id: str, body: UpdateReportBody) -> dict:
+    """Update only the ``generated_text`` column of one report.
+
+    The RM can edit the letter inline; KPIs and charts stay locked.
+    """
+    try:
+        row = await reports_db.get_report(report_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    ok = await reports_db.update_report_text(report_id, body.generated_text)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Update failed")
+
+    updated = await reports_db.get_report(report_id)
+    return updated or row
