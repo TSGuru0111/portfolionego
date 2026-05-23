@@ -9,8 +9,10 @@ import Card from '../components/ui/Card.jsx'
 import Spinner from '../components/ui/Spinner.jsx'
 import HoldingsTable from '../components/client/HoldingsTable.jsx'
 import ReturnSummary from '../components/client/ReturnSummary.jsx'
-import SectorChart from '../components/client/SectorChart.jsx'
 import PastReportsList from '../components/report/PastReportsList.jsx'
+import SectorDonut from '../components/report/SectorDonut'
+import KpiTile from '../components/report/KpiTile'
+import '../components/report/report.css'
 import { formatCr, formatDateIN } from '../utils/formatters.js'
 import { RISK_LABELS } from '../utils/constants.js'
 import { usePortfolio } from '../hooks/usePortfolio.js'
@@ -23,7 +25,7 @@ function defaultMonth() {
 
 export default function ClientDetail() {
   const { id } = useParams()
-  const { portfolio, loading, error } = usePortfolio(id)
+  const { data: portfolio, loading, error } = usePortfolio(id)
   const [month, setMonth] = useState(defaultMonth())
 
   const newReportHref = useMemo(
@@ -54,6 +56,30 @@ export default function ClientDetail() {
   const client = portfolio.client ?? {}
   const holdings = portfolio.holdings ?? []
 
+  const sectorAllocation = (() => {
+    const totals = {}
+    let grand = 0
+    for (const h of holdings || []) {
+      const mv = Number(h.qty || 0) * Number(h.current_price || h.avg_price || 0)
+      if (!mv) continue
+      const s = h.sector || 'Other'
+      totals[s] = (totals[s] || 0) + mv
+      grand += mv
+    }
+    if (!grand) return []
+    return Object.entries(totals)
+      .map(([sector, mv]) => ({ sector, weight_pct: (mv / grand) * 100 }))
+      .sort((a, b) => b.weight_pct - a.weight_pct)
+  })()
+
+  const portfolioValueCr = (() => {
+    let total = 0
+    for (const h of holdings || []) {
+      total += Number(h.qty || 0) * Number(h.current_price || h.avg_price || 0)
+    }
+    return total / 1e7
+  })()
+
   return (
     <div className="space-y-6">
       <Link
@@ -73,7 +99,7 @@ export default function ClientDetail() {
             AUM {formatCr(client.aum)}
             {client.risk_profile && (
               <span className="ml-2 text-xs uppercase tracking-wide text-slate-400">
-                {RISK_LABELS[client.risk_profile] ?? client.risk_profile}
+                {RISK_LABELS[client.risk_profile]?.label ?? client.risk_profile}
               </span>
             )}
           </div>
@@ -105,6 +131,18 @@ export default function ClientDetail() {
         </div>
       </div>
 
+      <div className="kpi-row">
+        <KpiTile label="Portfolio value"
+                 value={`₹${portfolioValueCr.toFixed(2)} Cr`}
+                 sublabel={`${(holdings || []).length} holdings`} />
+        <KpiTile label="Risk profile"
+                 value={client?.risk_profile || '—'} />
+        <KpiTile label="Tax bracket"
+                 value={client?.tax_bracket ? `${client.tax_bracket}%` : '—'} />
+        <KpiTile label="Liquidity need"
+                 value={client?.liquidity_need_pct != null ? `${client.liquidity_need_pct}%` : '—'} />
+      </div>
+
       {portfolio.has_stale_prices && (
         <Banner tone="warning">
           Some prices could not be refreshed from NSE/BSE and are shown from the
@@ -128,7 +166,7 @@ export default function ClientDetail() {
             <h2 className="text-base font-semibold text-slate-900 mb-3">
               Sector mix
             </h2>
-            <SectorChart holdings={holdings} />
+            <SectorDonut allocation={sectorAllocation} />
           </Card>
           <PastReportsList clientId={id} />
         </div>
