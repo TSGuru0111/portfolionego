@@ -78,3 +78,48 @@ def test_absolute_gain_negative_when_loss():
     result = compute_absolute_gain(holdings)
     assert result["value"] == pytest.approx(-20000.0)
     assert result["partial"] is False
+
+
+from services.portfolio_analytics import compute_drift
+
+
+def test_drift_perfect_match_aggressive():
+    holdings = [
+        {"qty": 700, "current_price": 1, "sector": "Technology"},
+        {"qty": 250, "current_price": 1, "sector": "Debt"},
+        {"qty":  50, "current_price": 1, "sector": "Cash"},
+    ]
+    assert compute_drift(holdings, "aggressive") == pytest.approx(0.0, abs=0.01)
+
+
+def test_drift_all_equity_vs_moderate():
+    holdings = [{"qty": 100, "current_price": 100, "sector": "Technology"}]
+    assert compute_drift(holdings, "moderate") == pytest.approx(50.0, abs=0.01)
+
+
+def test_drift_unknown_risk_profile_uses_moderate():
+    holdings = [{"qty": 100, "current_price": 100, "sector": "Technology"}]
+    assert compute_drift(holdings, "gambler") == pytest.approx(50.0, abs=0.01)
+
+
+def test_drift_none_risk_profile_uses_moderate():
+    holdings = [{"qty": 100, "current_price": 100, "sector": "Technology"}]
+    assert compute_drift(holdings, None) == pytest.approx(50.0, abs=0.01)
+
+
+def test_drift_zero_total_mv_returns_none():
+    holdings = [{"qty": 0, "current_price": 0, "sector": "Technology"}]
+    assert compute_drift(holdings, "moderate") is None
+
+
+def test_drift_empty_holdings_returns_none():
+    assert compute_drift([], "moderate") is None
+
+
+def test_drift_debt_sector_recognized():
+    holdings = [
+        {"qty": 100, "current_price": 100, "sector": "Technology"},
+        {"qty": 100, "current_price": 100, "sector": "Fixed Income"},
+    ]
+    # 50/50 vs aggressive (70/25/5) → equity drift = 20, debt drift = 25, cash = 5
+    assert compute_drift(holdings, "aggressive") == pytest.approx(25.0, abs=0.01)

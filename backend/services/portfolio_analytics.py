@@ -61,3 +61,43 @@ def compute_absolute_gain(holdings: list[dict[str, Any]]) -> dict[str, Any]:
         "partial": bool(missing),
         "missing_tickers": missing,
     }
+
+
+from services.risk_profile import target_for
+
+DEBT_SECTORS: set[str] = {
+    "Debt", "Fixed Income", "Bonds", "Government Securities", "Corporate Bonds",
+}
+CASH_SECTORS: set[str] = {"Cash", "Liquid", "Money Market"}
+
+
+def _bucket_for(sector: str | None) -> str:
+    if not sector:
+        return "equity"
+    s = sector.strip()
+    if s in CASH_SECTORS:
+        return "cash"
+    if s in DEBT_SECTORS:
+        return "debt"
+    return "equity"
+
+
+def compute_drift(
+    holdings: list[dict[str, Any]],
+    risk_profile: str | None,
+) -> float | None:
+    """Max absolute % deviation of actual vs target equity/debt/cash allocation.
+
+    Returns None for empty or zero-value portfolios.
+    """
+    if not holdings:
+        return None
+    actual = {"equity": 0.0, "debt": 0.0, "cash": 0.0}
+    total = sum(_mv(h) for h in holdings)
+    if total <= 0:
+        return None
+    for h in holdings:
+        bucket = _bucket_for(h.get("sector"))
+        actual[bucket] += _mv(h) / total * 100.0
+    target = target_for(risk_profile)
+    return max(abs(actual[k] - target[k]) for k in target)
