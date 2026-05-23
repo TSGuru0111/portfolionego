@@ -23,6 +23,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 from dotenv import load_dotenv  # noqa: E402
 import requests  # noqa: E402
 from db import news_db  # noqa: E402
+from services import summariser  # noqa: E402
 
 # Load backend/.env so SUPABASE_*, COHERE_*, NEWSAPI_KEY are available.
 load_dotenv(BACKEND_DIR / ".env")
@@ -177,6 +178,76 @@ async def backfill_daily_news(today: date, dry_run: bool) -> int:
     return inserted
 
 
+async def backfill_weekly_summaries(today: date, dry_run: bool) -> int:
+    """Phase 2: generate weekly summaries for the last WEEKS_TO_SUMMARISE weeks.
+
+    Skips weeks that already have a row in weekly_summaries. Returns the number
+    of weekly_summaries rows inserted (or that would be inserted in dry-run).
+    """
+    if dry_run:
+        print("[2/2] DRY-RUN: skipping weekly summary generation")
+        return 0
+
+    client = summariser._cohere_client()
+    if client is None:
+        print("[2/2] WARN: no COHERE_API_KEY, skipping weekly summaries", file=sys.stderr)
+        return 0
+
+    # Fetch existing summary week_starts once.
+    existing_summaries = await news_db.get_recent_weekly_summaries(weeks=20)
+    existing_week_starts = {
+        s["week_start"] for s in existing_summaries if s.get("week_start")
+    }
+
+    inserted_count = 0
+    for week_offset in range(WEEKS_TO_SUMMARISE):
+        week_end = today - timedelta(days=week_offset * 7)
+        week_start = week_end - timedelta(days=7)
+        week_start_iso = week_start.isoformat()
+        week_end_iso = week_end.isoformat()
+        label = f"[2/2] Week {week_start_iso} to {week_end_iso}"
+
+        if week_start_iso in existing_week_starts:
+            print(f"{label}: already exists, skipping")
+            continue
+
+        # Fetch rows in [week_start, week_end] inclusive.
+        rows = await news_db.get_daily_news_since(week_start_iso)
+        rows = [r for r in rows if r.get("date") and r["date"] <= week_end_iso]
+        if not rows:
+            print(f"{label}: no headlines, skipping summary")
+            continue
+
+        grouped = summariser._group_by_category(rows)
+        summaries: dict[str, str] = {}
+        for category, items in grouped.items():
+            text = await summariser._summarise_category(client, category, items)
+            if text:
+                summaries[category] = text
+
+        if not summaries:
+            print(f"{label}: all categories failed Cohere call, skipping insert")
+            continue
+
+        try:
+            summary_id = await news_db.save_weekly_summary(
+                week_start=week_start_iso,
+                week_end=week_end_iso,
+                summaries=summaries,
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"{label}: ERROR saving summary: {exc}", file=sys.stderr)
+            continue
+
+        print(
+            f"{label}: {len(summaries)} category(s), {len(rows)} headlines, "
+            f"saved id={summary_id}"
+        )
+        inserted_count += 1
+
+    return inserted_count
+
+
 def check_env() -> None:
     """Hard-fail with a clear message if any required env var is missing."""
     missing = [k for k in REQUIRED_ENV if not os.getenv(k)]
@@ -202,9 +273,13 @@ async def main() -> int:
     today = date.today()
     print(f"Backfill starting (today={today.isoformat()}, dry_run={args.dry_run})")
 
-    await backfill_daily_news(today, args.dry_run)
-    # Phase 2 wired in next task.
-    print("Done.")
+    daily_inserted = await backfill_daily_news(today, args.dry_run)
+    weekly_inserted = await backfill_weekly_summaries(today, args.dry_run)
+
+    print(
+        f"Done. {daily_inserted} daily_news rows, "
+        f"{weekly_inserted} weekly_summaries rows."
+    )
     return 0
 
 
