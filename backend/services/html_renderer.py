@@ -10,6 +10,7 @@ Output of ``render_report_card(report_row)``:
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 from datetime import date, datetime, timedelta
@@ -18,8 +19,16 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from services.context_builder import build_context_packet
-from services.market_data import _safe_float  # noqa: WPS450 — internal helper
+
+def _safe_float(x: Any) -> float | None:
+    """Convert *x* to float, returning None for NaN / Inf / unconvertible."""
+    try:
+        f = float(x)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(f) or math.isinf(f):
+        return None
+    return f
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 TEMPLATE_DIR = BACKEND_DIR / "static" / "templates"
@@ -370,10 +379,110 @@ def _next_steps(packet: dict[str, Any]) -> list[dict[str, str]]:
     return items[:3]
 
 
+def _portfolio_return_pct(holdings: list[dict[str, Any]]) -> float | None:
+    """Compute market-value-weighted portfolio return for the month."""
+    total_mv = sum(
+        (_safe_float(h.get("qty")) or 0.0) * (_safe_float(h.get("current_price")) or 0.0)
+        for h in holdings
+    )
+    if not total_mv:
+        return None
+    weighted = sum(
+        (_safe_float(h.get("qty")) or 0.0)
+        * (_safe_float(h.get("current_price")) or 0.0)
+        * (_safe_float(h.get("month_return_pct")) or 0.0)
+        for h in holdings
+    )
+    return weighted / total_mv
+
+
+def _market_context_cards(
+    market: dict[str, Any],
+    packet: dict[str, Any],
+) -> list[dict[str, str]]:
+    """Return four market-context cards suitable for a JSON/frontend consumer.
+
+    Derives text from the same logic as ``_market_context`` so the two
+    representations stay in sync.
+    """
+    ctx = _market_context(packet)
+    return [
+        {"title": "Indian Markets", "body": ctx["indian"]},
+        {"title": "Global Markets", "body": ctx["global"]},
+        {"title": "Economy",        "body": ctx["economy"]},
+        {"title": "Outlook",        "body": ctx["outlook"]},
+    ]
+
+
+def build_report_data(packet: dict) -> dict:
+    """Shape the report packet into the JSON dict consumed by both the
+    Jinja HTML template and the /reports/{id}/data JSON endpoint.
+
+    Single source of truth for KPIs, sector allocation, top movers,
+    market context, next-steps cards, and the letter text.
+    """
+    client = packet.get("client") or {}
+    portfolio = packet.get("portfolio") or {}
+    holdings = packet.get("holdings") or []
+    market = packet.get("market") or {}
+
+    # ─── KPIs ──────────────────────────────────────────
+    portfolio_value_cr = _portfolio_value_cr(holdings)
+    return_mtd_pct = _portfolio_return_pct(holdings)
+    nifty_mtd_pct = _safe_float(market.get("nifty_mtd_pct"))
+    alpha_pct = (
+        return_mtd_pct - nifty_mtd_pct
+        if return_mtd_pct is not None and nifty_mtd_pct is not None
+        else None
+    )
+    kpis = {
+        "portfolio_value_cr": portfolio_value_cr,
+        "holdings_count": len(holdings),
+        "return_mtd_pct": return_mtd_pct,
+        "nifty_mtd_pct": nifty_mtd_pct,
+        "alpha_pct": alpha_pct,
+    }
+
+    # ─── Sector allocation ─────────────────────────────
+    sector_alloc_dict = _allocation_by_sector(holdings)  # returns {sector: pct}
+    sector_allocation = [
+        {"sector": s, "weight_pct": round(w, 2)}
+        for s, w in sorted(sector_alloc_dict.items(), key=lambda kv: -kv[1])
+    ]
+
+    # ─── Top movers ────────────────────────────────────
+    movers_sorted = sorted(
+        holdings,
+        key=lambda h: _safe_float(h.get("month_return_pct")) or 0,
+        reverse=True,
+    )
+    top_contributors = movers_sorted[:3]
+    top_detractors = list(reversed(movers_sorted[-3:]))
+
+    return {
+        "report_id": packet.get("report_id"),
+        "client_name": client.get("name"),
+        "month": packet.get("month"),
+        "currency": client.get("currency", "INR"),
+        "qa_score": packet.get("qa_score"),
+        "kpis": kpis,
+        "holdings": holdings,
+        "top_contributors": top_contributors,
+        "top_detractors": top_detractors,
+        "sector_allocation": sector_allocation,
+        "nav_series": packet.get("nav_series"),  # None until backfilled
+        "market_context": _market_context_cards(market, packet),
+        "next_steps": _next_steps(packet),
+        "letter_text": packet.get("letter_text") or packet.get("generated_text", ""),
+    }
+
+
 # ───────────────────────────────────────────────── public ──
 
 async def render_report_card(report_row: dict[str, Any]) -> str:
     """Render the rich HTML report card for one saved report."""
+    from services.context_builder import build_context_packet  # lazy — avoids yfinance at import time
+
     client_id = report_row.get("client_id")
     month = str(report_row.get("month") or "")
     letter_text = report_row.get("generated_text") or ""
