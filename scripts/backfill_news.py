@@ -76,6 +76,24 @@ def parse_article(article: dict, today: date) -> dict | None:
     }
 
 
+def dedupe_rows(rows: list[dict]) -> list[dict]:
+    """Drop rows with duplicate (date, headline) tuples. Preserves first occurrence."""
+    seen: set[tuple[str, str]] = set()
+    out: list[dict] = []
+    for r in rows:
+        key = (r.get("date", ""), r.get("headline", ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(r)
+    return out
+
+
+def filter_existing_dates(rows: list[dict], existing_dates: set[str]) -> list[dict]:
+    """Return only rows whose date is NOT in existing_dates."""
+    return [r for r in rows if r.get("date") not in existing_dates]
+
+
 def check_env() -> None:
     """Hard-fail with a clear message if any required env var is missing."""
     missing = [k for k in REQUIRED_ENV if not os.getenv(k)]
