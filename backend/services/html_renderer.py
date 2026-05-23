@@ -19,6 +19,13 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from services.portfolio_analytics import (
+    compute_absolute_gain,
+    compute_concentration,
+    compute_drift,
+    compute_xirr,
+)
+
 
 def _safe_float(x: Any) -> float | None:
     """Convert *x* to float, returning None for NaN / Inf / unconvertible."""
@@ -442,6 +449,18 @@ def build_report_data(packet: dict) -> dict:
         "nifty_mtd_pct": nifty_mtd_pct,
         "alpha_pct": alpha_pct,
     }
+
+    # ─── v2 RM-perspective KPIs (null-discipline: None ≠ 0) ───
+    holdings_mv = sum(
+        (float(h.get("qty") or 0) * float(h.get("current_price") or 0))
+        for h in holdings
+    )
+    xirr = compute_xirr(packet.get("transactions") or [], current_value=holdings_mv)
+    risk = (client or {}).get("risk_profile")
+    kpis["absolute_gain"] = compute_absolute_gain(holdings)
+    kpis["xirr_pct"] = (xirr * 100.0) if xirr is not None else None
+    kpis["drift_pct"] = compute_drift(holdings, risk)
+    kpis["concentration_pct"] = compute_concentration(holdings)
 
     # ─── Sector allocation ─────────────────────────────
     sector_alloc_dict = _allocation_by_sector(holdings)  # returns {sector: pct}
