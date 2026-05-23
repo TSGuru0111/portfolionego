@@ -27,3 +27,37 @@ def compute_concentration(holdings: list[dict[str, Any]]) -> float | None:
         return None
     top3 = sum(sorted(mvs, reverse=True)[:3])
     return top3 / total * 100.0
+
+
+def compute_absolute_gain(holdings: list[dict[str, Any]]) -> dict[str, Any]:
+    """Return {value, partial, missing_tickers}.
+
+    value is None when ALL holdings are missing current_price OR holdings is empty.
+    partial is True when at least one holding was skipped.
+    """
+    if not holdings:
+        return {"value": None, "partial": False, "missing_tickers": []}
+
+    gain = 0.0
+    missing: list[str] = []
+    counted = 0
+    for h in holdings:
+        cp = h.get("current_price")
+        if cp is None:
+            missing.append(h.get("ticker", "?"))
+            continue
+        try:
+            qty = float(h.get("qty") or 0)
+            bp = float(h.get("buy_price") or 0)
+            cp_f = float(cp)
+        except (TypeError, ValueError):
+            missing.append(h.get("ticker", "?"))
+            continue
+        gain += qty * (cp_f - bp)
+        counted += 1
+
+    return {
+        "value": gain if counted > 0 else None,
+        "partial": bool(missing),
+        "missing_tickers": missing,
+    }
