@@ -101,3 +101,52 @@ def compute_drift(
         actual[bucket] += _mv(h) / total * 100.0
     target = target_for(risk_profile)
     return max(abs(actual[k] - target[k]) for k in target)
+
+
+from datetime import date as _date
+from scipy.optimize import brentq
+
+_BUY_TYPES = {"BUY", "SIP", "PURCHASE"}
+
+
+def _npv(rate: float, cashflows: list[tuple[_date, float]]) -> float:
+    t0 = cashflows[0][0]
+    total = 0.0
+    for d, cf in cashflows:
+        years = (d - t0).days / 365.0
+        total += cf / ((1 + rate) ** years)
+    return total
+
+
+def compute_xirr(
+    transactions: list[dict[str, Any]],
+    current_value: float,
+    today: _date | None = None,
+) -> float | None:
+    """Return XIRR as a decimal (0.14 == 14% p.a.).
+
+    BUY/SIP/PURCHASE cashflows are outflows (negative); everything else is an
+    inflow. The terminal current_value is added as a positive cashflow at
+    `today`. Returns None when inputs are insufficient or root-finder fails.
+    """
+    if not transactions:
+        return None
+    if current_value is None or current_value <= 0:
+        return None
+
+    cashflows: list[tuple[_date, float]] = []
+    for t in transactions:
+        try:
+            amt = float(t["total_value"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        sign = -1 if (t.get("txn_type") or "").upper() in _BUY_TYPES else +1
+        cashflows.append((t["txn_date"], sign * amt))
+
+    cashflows.append((today or _date.today(), float(current_value)))
+    cashflows.sort(key=lambda x: x[0])
+
+    try:
+        return brentq(_npv, -0.99, 10.0, args=(cashflows,), maxiter=200)
+    except (ValueError, RuntimeError):
+        return None
