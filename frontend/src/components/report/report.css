@@ -1,0 +1,90 @@
+.report-dashboard {
+  display: grid;
+  gap: 20px;
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+  color: #1a1a1a;
+}
+
+.report-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 12px;
+}
+
+.report-header h1 { margin: 0; font-size: 28px; font-weight: 700; }
+.report-header .month { color: #6b7280; font-size: 14px; }
+.report-header .qa-badge {
+  background: #ecfdf5; color: #047857; padding: 4px 12px;
+  border-radius: 999px; font-size: 13px; font-weight: 600;
+}
+
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+.kpi-tile {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+  padding: 16px 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.kpi-tile .label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+.kpi-tile .value { font-size: 26px; font-weight: 700; margin-top: 6px; }
+.kpi-tile .sublabel { font-size: 13px; color: #6b7280; margin-top: 4px; }
+.kpi-tile.tone-positive .value { color: #047857; }
+.kpi-tile.tone-negative .value { color: #b91c1c; }
+
+.chart-row { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+
+.chart-card, .movers-card, .market-card, .next-card, .letter-card {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+  padding: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.chart-card h3, .movers-card h3, .market-card h3, .next-card h3, .letter-card h3 {
+  margin: 0 0 12px 0; font-size: 16px; font-weight: 600;
+}
+
+.movers-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.movers-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.movers-table th { text-align: left; color: #6b7280; font-weight: 500; padding: 6px 8px; border-bottom: 1px solid #e5e7eb; }
+.movers-table td { padding: 8px; border-bottom: 1px solid #f3f4f6; }
+.movers-table td.ret-pos { color: #047857; font-weight: 600; }
+.movers-table td.ret-neg { color: #b91c1c; font-weight: 600; }
+
+.market-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.market-card-inner { padding: 12px; background: #f9fafb; border-radius: 8px; }
+.market-card-inner h4 { margin: 0 0 6px 0; font-size: 13px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+.market-card-inner p { margin: 0; font-size: 14px; line-height: 1.5; }
+
+.next-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.next-card { display: flex; flex-direction: column; gap: 8px; }
+.next-card .icon { font-size: 22px; }
+.next-card .title { font-size: 14px; font-weight: 600; }
+.next-card .body { font-size: 13px; color: #4b5563; line-height: 1.5; }
+
+.letter-card .letter-body { font-size: 15px; line-height: 1.7; color: #1f2937; }
+.letter-card .letter-body p { margin: 0 0 14px 0; }
+.letter-card.editing .letter-body p {
+  outline: 1px dashed #9ca3af; padding: 6px 8px; border-radius: 6px;
+}
+.letter-card.editing .letter-body p:hover { background: #fffbeb; }
+.streaming-cursor { display: inline-block; width: 8px; height: 18px; background: #1f2937; margin-left: 2px; animation: blink 1s steps(2) infinite; vertical-align: middle; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.action-bar {
+  position: sticky; bottom: 0; background: #fff;
+  border-top: 1px solid #e5e7eb; padding: 12px 24px;
+  display: flex; gap: 12px; justify-content: flex-end;
+  box-shadow: 0 -1px 3px rgba(0,0,0,0.04);
+}
+.action-bar button {
+  border: 1px solid #d1d5db; background: #fff; color: #111827;
+  padding: 8px 16px; border-radius: 8px; font-size: 14px;
+  cursor: pointer; font-weight: 500;
+}
+.action-bar button.primary { background: #111827; color: #fff; border-color: #111827; }
+.action-bar button.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.action-bar button.danger { color: #b91c1c; }
+
+.empty-chart { display: flex; align-items: center; justify-content: center; height: 240px; color: #9ca3af; font-size: 13px; border: 1px dashed #e5e7eb; border-radius: 8px; }
