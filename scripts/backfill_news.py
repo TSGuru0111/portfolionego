@@ -21,6 +21,7 @@ BACKEND_DIR = PROJECT_ROOT / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 
 from dotenv import load_dotenv  # noqa: E402
+import requests  # noqa: E402
 
 # Load backend/.env so SUPABASE_*, COHERE_*, NEWSAPI_KEY are available.
 load_dotenv(BACKEND_DIR / ".env")
@@ -92,6 +93,48 @@ def dedupe_rows(rows: list[dict]) -> list[dict]:
 def filter_existing_dates(rows: list[dict], existing_dates: set[str]) -> list[dict]:
     """Return only rows whose date is NOT in existing_dates."""
     return [r for r in rows if r.get("date") not in existing_dates]
+
+
+NEWSAPI_URL = "https://newsapi.org/v2/everything"
+NEWSAPI_PAGE_SIZE = 100
+REQUEST_TIMEOUT = 30  # seconds
+
+
+def fetch_newsapi_range(query: str, from_date: date, to_date: date, api_key: str) -> list[dict]:
+    """Fetch articles for a single query across a date range.
+
+    Returns the raw `articles` list from NewsAPI. On HTTP error or non-200
+    response, logs to stderr and returns an empty list (never raises).
+    """
+    params = {
+        "q": query,
+        "from": from_date.isoformat(),
+        "to": to_date.isoformat(),
+        "pageSize": NEWSAPI_PAGE_SIZE,
+        "sortBy": "publishedAt",
+        "language": "en",
+        "apiKey": api_key,
+    }
+    try:
+        res = requests.get(NEWSAPI_URL, params=params, timeout=REQUEST_TIMEOUT)
+        res.raise_for_status()
+        payload = res.json()
+    except requests.RequestException as exc:
+        print(f"  WARN: NewsAPI request failed for {query!r}: {exc}", file=sys.stderr)
+        return []
+    except ValueError as exc:
+        print(f"  WARN: NewsAPI JSON decode failed for {query!r}: {exc}", file=sys.stderr)
+        return []
+
+    if payload.get("status") != "ok":
+        print(
+            f"  WARN: NewsAPI returned non-ok status for {query!r}: "
+            f"{payload.get('code')} {payload.get('message')}",
+            file=sys.stderr,
+        )
+        return []
+
+    return payload.get("articles") or []
 
 
 def check_env() -> None:
