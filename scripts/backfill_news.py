@@ -22,6 +22,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 from dotenv import load_dotenv  # noqa: E402
 import requests  # noqa: E402
+from db import news_db  # noqa: E402
 
 # Load backend/.env so SUPABASE_*, COHERE_*, NEWSAPI_KEY are available.
 load_dotenv(BACKEND_DIR / ".env")
@@ -137,6 +138,45 @@ def fetch_newsapi_range(query: str, from_date: date, to_date: date, api_key: str
     return payload.get("articles") or []
 
 
+async def backfill_daily_news(today: date, dry_run: bool) -> int:
+    """Phase 1: fetch from NewsAPI, dedupe, skip existing dates, insert.
+
+    Returns the number of rows inserted (or that would be inserted in dry-run).
+    """
+    api_key = os.getenv("NEWSAPI_KEY", "")
+    from_date = today - timedelta(days=LOOKBACK_DAYS)
+
+    all_rows: list[dict] = []
+    for i, query in enumerate(NEWSAPI_QUERIES, start=1):
+        print(f"[1/2] Fetching NewsAPI for {query!r} ({i}/{len(NEWSAPI_QUERIES)})...")
+        articles = fetch_newsapi_range(query, from_date, today, api_key)
+        parsed = [parse_article(a, today=today) for a in articles]
+        kept = [r for r in parsed if r is not None]
+        print(f"       {len(articles)} articles, {len(kept)} kept after filter")
+        all_rows.extend(kept)
+
+    deduped = dedupe_rows(all_rows)
+    print(f"[1/2] Deduped {len(all_rows)} -> {len(deduped)} unique rows")
+
+    existing_rows = await news_db.get_daily_news_since(from_date.isoformat())
+    existing_dates = {r["date"] for r in existing_rows if r.get("date")}
+    new_rows = filter_existing_dates(deduped, existing_dates)
+    print(
+        f"[1/2] {len(existing_dates)} dates already populated; "
+        f"{len(new_rows)} rows to insert"
+    )
+
+    if dry_run:
+        print("[1/2] DRY-RUN: skipping insert. Sample rows:")
+        for r in new_rows[:3]:
+            print(f"       {r['date']} | {r['source']} | {r['headline'][:80]}")
+        return len(new_rows)
+
+    inserted = await news_db.save_daily_news(new_rows)
+    print(f"[1/2] Inserted {inserted} rows into daily_news")
+    return inserted
+
+
 def check_env() -> None:
     """Hard-fail with a clear message if any required env var is missing."""
     missing = [k for k in REQUIRED_ENV if not os.getenv(k)]
@@ -159,8 +199,12 @@ def parse_args() -> argparse.Namespace:
 async def main() -> int:
     args = parse_args()
     check_env()
-    print(f"Backfill starting (dry_run={args.dry_run})")
-    # Phase 1 + Phase 2 wired in later tasks.
+    today = date.today()
+    print(f"Backfill starting (today={today.isoformat()}, dry_run={args.dry_run})")
+
+    await backfill_daily_news(today, args.dry_run)
+    # Phase 2 wired in next task.
+    print("Done.")
     return 0
 
 
