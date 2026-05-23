@@ -86,3 +86,18 @@ async def update_report_hindi(report_id: str, hindi_text: str) -> bool:
         .execute()
     )
     return bool(res.data)
+
+
+async def update_report_text(report_id: str, generated_text: str) -> bool:
+    """Patch the ``generated_text`` column for one report.
+
+    Returns True if a row was updated, False otherwise.
+    """
+    supabase = _require_supabase()
+    res = (
+        supabase.table("reports")
+        .update({"generated_text": generated_text})
+        .eq("id", report_id)
+        .execute()
+    )
+    return bool(res.data)
