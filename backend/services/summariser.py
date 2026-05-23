@@ -21,7 +21,7 @@ import cohere
 from db import news_db
 from services.error_logger import log_error
 
-SUMMARY_MODEL = "command-r"
+SUMMARY_MODEL = "command-r-08-2024"
 MAX_HEADLINES_PER_CATEGORY = 30
 MAX_OUTPUT_TOKENS = 350
 
