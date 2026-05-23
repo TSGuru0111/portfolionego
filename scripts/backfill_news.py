@@ -37,6 +37,45 @@ LOOKBACK_DAYS = 30
 WEEKS_TO_SUMMARISE = 4
 
 
+def parse_article(article: dict, today: date) -> dict | None:
+    """Convert a NewsAPI article dict into a daily_news row.
+
+    Returns None for articles that should be dropped:
+    - missing or unparseable publishedAt
+    - publishedAt older than LOOKBACK_DAYS
+    - missing title
+    """
+    published_at = article.get("publishedAt")
+    if not published_at:
+        return None
+    try:
+        # NewsAPI returns ISO 8601 like "2026-05-10T08:30:00Z".
+        parsed = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+    article_date = parsed.date()
+    if (today - article_date).days > LOOKBACK_DAYS:
+        return None
+    if article_date > today:
+        return None
+
+    title = (article.get("title") or "").strip()
+    if not title:
+        return None
+
+    description = (article.get("description") or "").strip()
+    source_name = ((article.get("source") or {}).get("name") or "NewsAPI").strip()
+
+    return {
+        "date": article_date.isoformat(),
+        "category": "newsapi",
+        "headline": title[:500],
+        "summary": description[:2000],
+        "source": source_name,
+    }
+
+
 def check_env() -> None:
     """Hard-fail with a clear message if any required env var is missing."""
     missing = [k for k in REQUIRED_ENV if not os.getenv(k)]
