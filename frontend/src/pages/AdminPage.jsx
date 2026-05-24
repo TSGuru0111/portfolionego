@@ -1,10 +1,12 @@
 import TriggerPanel from '../components/admin/TriggerPanel.jsx'
 import ErrorLogTable from '../components/admin/ErrorLogTable.jsx'
 import JobRunsTable from '../components/admin/JobRunsTable.jsx'
+import BackLink from '../components/layout/BackLink'
 
 export default function AdminPage() {
   return (
     <div className="space-y-6">
+      <BackLink to="/dashboard" label="dashboard" />
       <div>
         <h1 className="font-serif text-2xl text-slate-900">Admin console</h1>
         <p className="text-sm text-slate-500 mt-1">
