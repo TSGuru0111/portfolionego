@@ -88,3 +88,56 @@
 .action-bar button.danger { color: #b91c1c; }
 
 .empty-chart { display: flex; align-items: center; justify-content: center; height: 240px; color: #9ca3af; font-size: 13px; border: 1px dashed #e5e7eb; border-radius: 8px; }
+
+/* ──── v2: KpiTile tone borders + missing-value muting ──── */
+.kpi-tile { border-left: 3px solid transparent; }
+.kpi-tile.tone-success { border-left-color: #10b981; }
+.kpi-tile.tone-gold    { border-left-color: #f59e0b; }
+.kpi-tile.tone-danger  { border-left-color: #ef4444; }
+.kpi-tile.tone-neutral { border-left-color: #94a3b8; }
+.kpi-tile.is-missing .value { color: #94a3b8; font-weight: 500; }
+
+/* ──── v2: 6-tile responsive KpiRow ──── */
+.kpi-row-v2 {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin: 16px 0 24px 0;
+}
+@media (max-width: 1023px) {
+  .kpi-row-v2 { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 639px) {
+  .kpi-row-v2 { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .kpi-row-v2 .kpi-tile .value { font-size: 18px; }
+}
+
+/* ──── v2: QAScoreBadge popover ──── */
+.qa-badge-wrap { position: relative; display: inline-block; }
+.qa-badge {
+  background: #ecfdf5; color: #047857; padding: 4px 12px;
+  border-radius: 999px; font-size: 13px; font-weight: 600;
+  border: none; cursor: pointer;
+}
+.qa-tone-gold   .qa-badge { background: #fffbeb; color: #b45309; }
+.qa-tone-danger .qa-badge { background: #fef2f2; color: #b91c1c; }
+
+.qa-popover {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: white; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 12px 16px; min-width: 280px; max-width: 360px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08); z-index: 50;
+  font-size: 13px; color: #334155;
+}
+.qa-popover-header { font-weight: 600; color: #0f172a; }
+.qa-popover-sub { color: #64748b; font-size: 12px; margin-bottom: 8px; }
+.qa-popover-reasons { padding-left: 18px; margin: 8px 0; }
+.qa-popover-reasons li { margin: 4px 0; }
+.qa-popover-empty { color: #94a3b8; font-style: italic; margin: 8px 0; }
+.qa-popover-footer {
+  border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 8px;
+  font-size: 12px; color: #94a3b8;
+}
+
+/* ──── v2: Report page back-nav spacing ──── */
+.report-page-nav { margin-bottom: 8px; }
