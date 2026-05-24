@@ -178,4 +178,6 @@ async def get_report_data(report_id: str) -> dict:
             "crude_mtd_pct": (packet.get("macro") or {}).get("crude_change_pct"),
         },
     }
-    return html_renderer.build_report_data(packet)
+    response = html_renderer.build_report_data(packet)
+    response["qa_reasons"] = row.get("qa_reasons") or []
+    return response
