@@ -45,3 +45,13 @@ export const returnColor = (value) =>
   value == null ? 'text-slate-500'
   : value >= 0   ? 'text-emerald-600'
   :                'text-red-600'
+
+/** Format an INR amount in lakhs/crores, always signed. Returns '—' for null/NaN. */
+export function formatAbsoluteINR(v) {
+  if (v == null || Number.isNaN(v)) return '—'
+  const abs = Math.abs(v)
+  const sign = v < 0 ? '-' : '+'
+  if (abs >= 1e7) return `${sign}₹${(abs / 1e7).toFixed(2)} Cr`
+  if (abs >= 1e5) return `${sign}₹${(abs / 1e5).toFixed(2)} L`
+  return `${sign}₹${abs.toFixed(0)}`
+}
