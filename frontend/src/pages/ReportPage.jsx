@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { api } from '../services/api'
 
-import KpiTile from '../components/report/KpiTile'
 import SectorDonut from '../components/report/SectorDonut'
 import NavLineChart from '../components/report/NavLineChart'
 import TopMoversTable from '../components/report/TopMoversTable'
@@ -10,21 +9,10 @@ import MarketContextGrid from '../components/report/MarketContextGrid'
 import NextStepsCards from '../components/report/NextStepsCards'
 import LetterCard from '../components/report/LetterCard'
 import ActionBar from '../components/report/ActionBar'
+import KpiRow from '../components/report/KpiRow'
+import QAScoreBadge from '../components/report/QAScoreBadge'
+import BackLink from '../components/layout/BackLink'
 import '../components/report/report.css'
-
-function fmtCr(v) {
-  if (v == null || Number.isNaN(v)) return '—'
-  return `₹${Number(v).toFixed(2)} Cr`
-}
-function fmtPct(v) {
-  if (v == null || Number.isNaN(v)) return '—'
-  const n = Number(v)
-  return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
-}
-function toneFromPct(v) {
-  if (v == null) return undefined
-  return Number(v) >= 0 ? 'positive' : 'negative'
-}
 
 export default function ReportPage() {
   const { id, reportId: reportIdParam } = useParams()
@@ -79,6 +67,10 @@ export default function ReportPage() {
           return_mtd_pct: null,
           nifty_mtd_pct: null,
           alpha_pct: null,
+          absolute_gain: null,
+          xirr_pct: null,
+          drift_pct: null,
+          concentration_pct: null,
         },
         holdings,
         top_contributors: [],
@@ -123,10 +115,6 @@ export default function ReportPage() {
 
     return () => { cancelled = true }
   }, [isNew, id, month])
-
-  const kpis = data?.kpis || {}
-  const alphaTone = toneFromPct(kpis.alpha_pct)
-  const returnTone = toneFromPct(kpis.return_mtd_pct)
 
   function handleLetterChange(next) {
     setLetterText(next)
@@ -177,31 +165,22 @@ export default function ReportPage() {
 
   return (
     <div className="report-dashboard">
+      <div className="report-page-nav">
+        <BackLink
+          to={`/clients/${data?.client_id || id}`}
+          label={data?.client_name || 'client'}
+        />
+      </div>
+
       <header className="report-header">
         <div>
           <h1>{data.client_name || 'Client'}</h1>
           <div className="month">Portfolio review · {data.month}</div>
         </div>
-        {data.qa_score != null ? (
-          <div className="qa-badge">QA · {data.qa_score}/10</div>
-        ) : null}
+        <QAScoreBadge score={data?.qa_score} reasons={data?.qa_reasons} />
       </header>
 
-      <div className="kpi-row">
-        <KpiTile label="Portfolio Value"
-                 value={fmtCr(kpis.portfolio_value_cr)}
-                 sublabel={`${kpis.holdings_count ?? 0} holdings`} />
-        <KpiTile label="Return (MTD)"
-                 value={fmtPct(kpis.return_mtd_pct)}
-                 tone={returnTone} />
-        <KpiTile label="Nifty 50 (MTD)"
-                 value={fmtPct(kpis.nifty_mtd_pct)}
-                 tone={toneFromPct(kpis.nifty_mtd_pct)} />
-        <KpiTile label="vs Nifty"
-                 value={fmtPct(kpis.alpha_pct)}
-                 tone={alphaTone}
-                 sublabel="Alpha" />
-      </div>
+      <KpiRow kpis={data?.kpis} />
 
       <div className="chart-row">
         <div className="chart-card">
