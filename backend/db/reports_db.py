@@ -24,6 +24,7 @@ async def save_report(
     month: str,
     generated_text: str,
     qa_score: int | None = None,
+    qa_reasons: list[str] | None = None,
     hindi_text: str | None = None,
     pdf_url: str | None = None,
 ) -> str | None:
@@ -34,6 +35,7 @@ async def save_report(
         "month": month,
         "generated_text": generated_text,
         "qa_score": qa_score,
+        "qa_reasons": qa_reasons or [],
     }
     if hindi_text is not None:
         payload["hindi_text"] = hindi_text
@@ -51,7 +53,7 @@ async def get_report(report_id: str) -> dict[str, Any] | None:
         supabase.table("reports")
         .select(
             "id, client_id, month, generated_text, hindi_text, "
-            "qa_score, pdf_url, created_at"
+            "qa_score, qa_reasons, pdf_url, created_at"
         )
         .eq("id", report_id)
         .limit(1)
@@ -82,6 +84,21 @@ async def update_report_hindi(report_id: str, hindi_text: str) -> bool:
     res = (
         supabase.table("reports")
         .update({"hindi_text": hindi_text})
+        .eq("id", report_id)
+        .execute()
+    )
+    return bool(res.data)
+
+
+async def update_report_text(report_id: str, generated_text: str) -> bool:
+    """Patch the ``generated_text`` column for one report.
+
+    Returns True if a row was updated, False otherwise.
+    """
+    supabase = _require_supabase()
+    res = (
+        supabase.table("reports")
+        .update({"generated_text": generated_text})
         .eq("id", report_id)
         .execute()
     )

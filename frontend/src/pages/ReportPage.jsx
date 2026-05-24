@@ -1,149 +1,223 @@
-import { useEffect, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Download, ExternalLink } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { useEffect, useRef, useState } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
+import { api } from '../services/api'
 
-import Button from '../components/ui/Button.jsx'
-import Card from '../components/ui/Card.jsx'
-import ReportViewer from '../components/report/ReportViewer.jsx'
-import QAScoreBadge from '../components/report/QAScoreBadge.jsx'
-import { api } from '../services/api.js'
-import { formatMonth } from '../utils/formatters.js'
-import { useStreamReport } from '../hooks/useStreamReport.js'
-
-function defaultMonth() {
-  const d = new Date()
-  d.setMonth(d.getMonth() - 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
+import SectorDonut from '../components/report/SectorDonut'
+import NavLineChart from '../components/report/NavLineChart'
+import TopMoversTable from '../components/report/TopMoversTable'
+import MarketContextGrid from '../components/report/MarketContextGrid'
+import NextStepsCards from '../components/report/NextStepsCards'
+import LetterCard from '../components/report/LetterCard'
+import ActionBar from '../components/report/ActionBar'
+import KpiRow from '../components/report/KpiRow'
+import QAScoreBadge from '../components/report/QAScoreBadge'
+import BackLink from '../components/layout/BackLink'
+import '../components/report/report.css'
 
 export default function ReportPage() {
-  const { id, reportId } = useParams()
-  const [params] = useSearchParams()
-  const month = params.get('month') ?? defaultMonth()
-  const isNew = reportId === 'new'
+  const { id, reportId: reportIdParam } = useParams()
+  const [searchParams] = useSearchParams()
+  const month = searchParams.get('month') || new Date().toISOString().slice(0, 7)
+  const isNew = reportIdParam === 'new'
 
-  const { reportText, isStreaming, error, generateReport } = useStreamReport()
-  const [qaScore, setQaScore] = useState(null)
-  const [resolvedReportId, setResolvedReportId] = useState(
-    isNew ? null : reportId,
-  )
-  const [downloading, setDownloading] = useState(false)
-  const [savedText, setSavedText] = useState('')
+  const [data, setData] = useState(null)
+  const [letterText, setLetterText] = useState('')
+  const [reportId, setReportId] = useState(isNew ? null : reportIdParam)
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
+  const [error, setError] = useState(null)
 
+  const originalTextRef = useRef('')
+
+  // Load existing report
+  useEffect(() => {
+    if (isNew) return
+    let cancelled = false
+    api.getReportData(reportIdParam).then(d => {
+      if (cancelled) return
+      setData(d)
+      setLetterText(d.letter_text || '')
+      originalTextRef.current = d.letter_text || ''
+      setReportId(d.report_id)
+    }).catch(e => !cancelled && setError(e.message))
+    return () => { cancelled = true }
+  }, [isNew, reportIdParam])
+
+  // Stream new report — and immediately fetch skeleton data
   useEffect(() => {
     if (!isNew) return
-    generateReport({ clientId: id, month })
-      .then((meta) => {
-        if (meta?.qa_score != null) setQaScore(meta.qa_score)
-        if (meta?.report_id) setResolvedReportId(meta.report_id)
-      })
-      .catch(() => { /* hook already surfaced the toast */ })
+    let cancelled = false
+
+    // Skeleton data: we don't have a saved report yet, so we fetch the
+    // client's portfolio + holdings via existing endpoints and build a
+    // minimal data shape. The full /data swap happens once streaming
+    // completes and we have a report_id.
+    api.getClientPortfolio(id).then(p => {
+      if (cancelled) return
+      const holdings = p?.portfolio?.holdings || p?.holdings || []
+      const skeleton = {
+        client_name: p?.client?.name || '',
+        month,
+        currency: p?.client?.currency || 'INR',
+        qa_score: null,
+        kpis: {
+          portfolio_value_cr: null,
+          holdings_count: holdings.length,
+          return_mtd_pct: null,
+          nifty_mtd_pct: null,
+          alpha_pct: null,
+          absolute_gain: null,
+          xirr_pct: null,
+          drift_pct: null,
+          concentration_pct: null,
+        },
+        holdings,
+        top_contributors: [],
+        top_detractors: [],
+        sector_allocation: [],
+        nav_series: null,
+        market_context: [],
+        next_steps: [],
+        letter_text: '',
+      }
+      setData(skeleton)
+    }).catch(() => { /* skeleton optional */ })
+
+    setIsStreaming(true)
+    api.generateReportStream({
+      clientId: id,
+      month,
+      onChunk: (delta) => {
+        if (cancelled) return
+        setLetterText(prev => prev + delta)
+      },
+    }).then(async (res) => {
+      if (cancelled) return
+      setIsStreaming(false)
+      if (res.report_id) {
+        setReportId(res.report_id)
+        try {
+          const full = await api.getReportData(res.report_id)
+          if (cancelled) return
+          setData(full)
+          setLetterText(full.letter_text || res.text || '')
+          originalTextRef.current = full.letter_text || res.text || ''
+        } catch (e) {
+          setError(e.message)
+        }
+      }
+    }).catch(e => {
+      if (cancelled) return
+      setIsStreaming(false)
+      setError(e.message)
+    })
+
+    return () => { cancelled = true }
   }, [isNew, id, month])
 
-  // When viewing a saved report, fetch the persisted text instead of
-  // re-streaming through Cohere.
-  useEffect(() => {
-    if (isNew || !reportId) return
-    let cancelled = false
-    api.getReport(reportId)
-      .then((row) => {
-        if (cancelled || !row) return
-        setSavedText(row.generated_text || '')
-        if (row.qa_score != null) setQaScore(row.qa_score)
-      })
-      .catch(() => { /* surfaced below via error message */ })
-    return () => { cancelled = true }
-  }, [isNew, reportId])
-
-  const displayText = isNew ? reportText : savedText
-
-  const downloadPdf = async () => {
-    if (!resolvedReportId) {
-      toast.error('Report has not been saved yet.')
-      return
-    }
-    setDownloading(true)
+  function handleLetterChange(next) {
+    setLetterText(next)
+    setIsDirty(next !== originalTextRef.current)
+  }
+  function handleToggleEdit() {
+    setIsEditing(true)
+    setIsDirty(false)
+  }
+  function handleCancel() {
+    setLetterText(originalTextRef.current)
+    setIsEditing(false)
+    setIsDirty(false)
+  }
+  async function handleSave() {
+    if (!reportId) return
     try {
-      const blob = await api.exportPdf(resolvedReportId)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `portfolio-letter-${month}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      toast.error(err.message || 'PDF download failed')
-    } finally {
-      setDownloading(false)
+      await api.updateReport(reportId, { generated_text: letterText })
+      originalTextRef.current = letterText
+      setIsEditing(false)
+      setIsDirty(false)
+    } catch (e) {
+      setError(e.message)
     }
   }
+  function handleDownload() {
+    if (!reportId) return
+    const headers = {}
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/reports/${reportId}/export-pdf?lang=english`, { headers })
+      .then(r => r.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `portfolio-review-${data?.month || month}.pdf`
+        document.body.appendChild(a); a.click(); a.remove()
+        URL.revokeObjectURL(url)
+      })
+      .catch(e => setError(e.message))
+  }
 
-  const openHtmlView = () => {
-    if (!resolvedReportId) {
-      toast.error('Report has not been saved yet.')
-      return
-    }
-    window.open(api.viewHtmlUrl(resolvedReportId), '_blank', 'noopener')
+  if (error) {
+    return <div className="report-dashboard"><div style={{ color: '#b91c1c' }}>Error: {error}</div></div>
+  }
+  if (!data) {
+    return <div className="report-dashboard"><div>Loading…</div></div>
   }
 
   return (
-    <div className="space-y-6">
-      <Link
-        to={`/clients/${id}`}
-        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-primary-700"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back to client
-      </Link>
+    <div className="report-dashboard">
+      <div className="report-page-nav">
+        <BackLink
+          to={`/clients/${data?.client_id || id}`}
+          label={data?.client_name || 'client'}
+        />
+      </div>
 
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+      <header className="report-header">
         <div>
-          <h1 className="font-serif text-2xl text-slate-900">
-            Portfolio commentary
-          </h1>
-          <div className="text-sm text-slate-500 mt-1">
-            {formatMonth(month)}
-            {qaScore != null && (
-              <span className="ml-3">
-                <QAScoreBadge score={qaScore} />
-              </span>
-            )}
-          </div>
+          <h1>{data.client_name || 'Client'}</h1>
+          <div className="month">Portfolio review · {data.month}</div>
         </div>
+        <QAScoreBadge score={data?.qa_score} reasons={data?.qa_reasons} />
+      </header>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            onClick={openHtmlView}
-            disabled={isStreaming || !resolvedReportId}
-          >
-            <ExternalLink className="w-4 h-4 mr-1" />
-            View HTML report
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={downloadPdf}
-            loading={downloading}
-            disabled={isStreaming || !resolvedReportId}
-          >
-            <Download className="w-4 h-4 mr-1" />
-            Download PDF
-          </Button>
+      <KpiRow kpis={data?.kpis} />
+
+      <div className="chart-row">
+        <div className="chart-card">
+          <h3>NAV vs Nifty 50 — last 90 days</h3>
+          <NavLineChart series={data.nav_series} />
+        </div>
+        <div className="chart-card">
+          <h3>Sector allocation</h3>
+          <SectorDonut allocation={data.sector_allocation} />
         </div>
       </div>
 
-      {error && (
-        <div className="text-sm text-red-600">
-          Generation error: {error}
-        </div>
-      )}
+      <div className="movers-row">
+        <TopMoversTable title="Top contributors" movers={data.top_contributors} />
+        <TopMoversTable title="Top detractors" movers={data.top_detractors} />
+      </div>
 
-      <Card>
-        <ReportViewer reportText={displayText} isStreaming={isStreaming} />
-      </Card>
+      <MarketContextGrid cards={data.market_context} />
+      <NextStepsCards items={data.next_steps} />
+
+      <LetterCard
+        text={letterText}
+        isEditing={isEditing}
+        isStreaming={isStreaming}
+        onChange={handleLetterChange}
+      />
+
+      <ActionBar
+        reportId={reportId}
+        isEditing={isEditing}
+        isDirty={isDirty}
+        isStreaming={isStreaming}
+        onToggleEdit={handleToggleEdit}
+        onSave={handleSave}
+        onCancel={handleCancel}
+        onDownload={handleDownload}
+      />
     </div>
   )
 }

@@ -10,6 +10,7 @@ Output of ``render_report_card(report_row)``:
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 from datetime import date, datetime, timedelta
@@ -18,8 +19,23 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from services.context_builder import build_context_packet
-from services.market_data import _safe_float  # noqa: WPS450 — internal helper
+from services.portfolio_analytics import (
+    compute_absolute_gain,
+    compute_concentration,
+    compute_drift,
+    compute_xirr,
+)
+
+
+def _safe_float(x: Any) -> float | None:
+    """Convert *x* to float, returning None for NaN / Inf / unconvertible."""
+    try:
+        f = float(x)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(f) or math.isinf(f):
+        return None
+    return f
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 TEMPLATE_DIR = BACKEND_DIR / "static" / "templates"
@@ -207,53 +223,285 @@ def _market_context(packet: dict[str, Any]) -> dict[str, str]:
     }
 
 
-def _next_steps(packet: dict[str, Any]) -> list[dict[str, str]]:
-    has_stale = packet.get("has_stale_prices")
-    items: list[dict[str, str]] = [
-        {
-            "icon": "✓",
-            "title": "Stay Invested",
+def _years_with_us(inception: Any) -> float | None:
+    if not inception:
+        return None
+    s = str(inception)
+    try:
+        if "T" in s:
+            inc_date = datetime.fromisoformat(s.replace("Z", "+00:00")).date()
+        else:
+            inc_date = date.fromisoformat(s[:10])
+    except (TypeError, ValueError):
+        return None
+    delta_days = (date.today() - inc_date).days
+    if delta_days <= 0:
+        return None
+    return delta_days / 365.25
+
+
+def _liquidity_or_income_card(
+    client: dict[str, Any],
+    holdings: list[dict[str, Any]],
+) -> dict[str, str]:
+    income_need = _safe_float(client.get("income_need_monthly"))
+    liquidity_pct = _safe_float(client.get("liquidity_need_pct"))
+    pv_cr = _portfolio_value_cr(holdings)
+
+    if income_need and income_need > 0:
+        annual_need_l = (income_need * 12) / 1_00_000
+        return {
+            "icon": "₹",
+            "title": "Income Lifeline",
             "body": (
-                "Your asset mix continues to align with the agreed risk "
-                "profile. No structural rebalancing required this month."
+                f"Your monthly drawdown of ₹{int(income_need):,} "
+                f"(₹{annual_need_l:.1f}L/yr) is funded from dividend "
+                f"yield on the defensive book and scheduled releases "
+                f"from short-duration debt — no equity sales required."
             ),
-        },
-        {
+        }
+    if liquidity_pct and liquidity_pct > 0:
+        liquid_cr = pv_cr * (liquidity_pct / 100)
+        return {
+            "icon": "≈",
+            "title": "Liquidity Cushion",
+            "body": (
+                f"Your {liquidity_pct:.0f}% liquidity target "
+                f"(~₹{liquid_cr:.2f} Cr) is maintained in short-duration "
+                f"debt and liquid funds — redeemable within 24 hours "
+                f"if needed."
+            ),
+        }
+    return {
+        "icon": "✓",
+        "title": "Stay Invested",
+        "body": (
+            "Your asset mix continues to align with the agreed risk "
+            "profile. No structural rebalancing required this month."
+        ),
+    }
+
+
+def _rebalance_card(holdings: list[dict[str, Any]]) -> dict[str, str]:
+    alloc = _allocation_by_sector(holdings)
+    if not alloc:
+        return {
+            "icon": "↻",
+            "title": "Rebalance Spot Check",
+            "body": "Sector mix is broadly aligned with your target bands.",
+        }
+    top_sector, top_pct = max(alloc.items(), key=lambda kv: kv[1])
+    if top_pct > 35:
+        trim_pp = max(5, int((top_pct - 25) // 5) * 5)
+        return {
             "icon": "↻",
             "title": "Rebalance Spot Check",
             "body": (
-                "We are watching the IT weight relative to your target band "
-                "and may suggest a 5-percentage-point trim on the next bounce."
+                f"{top_sector} is {top_pct:.1f}% of the book — above the "
+                f"25% single-sector band. We may suggest a {trim_pp}-point "
+                f"trim on the next rally."
             ),
-        },
-        {
-            "icon": "✨",
-            "title": "Opportunities",
+        }
+    if top_pct > 25:
+        return {
+            "icon": "↻",
+            "title": "Rebalance Spot Check",
             "body": (
-                "Two domestic-consumption names are on our shortlist; "
-                "we will share the note ahead of your next review."
+                f"We are watching {top_sector} at {top_pct:.1f}% of the "
+                f"book relative to your target band and may flag a small "
+                f"trim on the next bounce."
             ),
-        },
+        }
+    return {
+        "icon": "↻",
+        "title": "Rebalance Spot Check",
+        "body": (
+            f"Top sector weight is {top_sector} at {top_pct:.1f}% — "
+            f"comfortably within target bands. No rebalance flagged."
+        ),
+    }
+
+
+def _tax_or_tenure_card(
+    client: dict[str, Any],
+    portfolio: dict[str, Any],
+) -> dict[str, str]:
+    years = _years_with_us(portfolio.get("inception_date"))
+    tax_bracket = (client.get("tax_bracket") or "").strip()
+
+    if years is not None and years >= 3:
+        return {
+            "icon": "★",
+            "title": "Long-Term Edge",
+            "body": (
+                f"You have completed {years:.1f} years with us. All "
+                f"equity holdings now qualify for the 12.5% long-term "
+                f"capital gains rate, materially better than slab-rate "
+                f"taxation on short-term gains."
+            ),
+        }
+    if "30" in tax_bracket:
+        return {
+            "icon": "✨",
+            "title": "Tax-Loss Harvest",
+            "body": (
+                "Given your 30% slab, we will review tax-loss harvest "
+                "candidates from this quarter's detractors ahead of "
+                "March-end to offset realised gains elsewhere in the book."
+            ),
+        }
+    return {
+        "icon": "✨",
+        "title": "Opportunities",
+        "body": (
+            "Two domestic-consumption names are on our shortlist; "
+            "we will share the note ahead of your next review."
+        ),
+    }
+
+
+def _next_steps(packet: dict[str, Any]) -> list[dict[str, str]]:
+    client = packet.get("client") or {}
+    portfolio = packet.get("portfolio") or {}
+    holdings = packet.get("holdings") or []
+
+    items: list[dict[str, str]] = [
+        _liquidity_or_income_card(client, holdings),
+        _rebalance_card(holdings),
+        _tax_or_tenure_card(client, portfolio),
     ]
-    if has_stale:
+
+    if packet.get("has_stale_prices"):
         items.append(
             {
                 "icon": "!",
                 "title": "Data Refresh",
                 "body": (
-                    "Some live prices were unavailable at cut-off — we used "
-                    "the most recent cached close. Numbers will fully refresh "
-                    "on the next market open."
+                    "Some live prices were unavailable at cut-off — we "
+                    "used the most recent cached close. Numbers will "
+                    "fully refresh on the next market open."
                 ),
             }
         )
     return items[:3]
 
 
+def _portfolio_return_pct(holdings: list[dict[str, Any]]) -> float | None:
+    """Compute market-value-weighted portfolio return for the month."""
+    total_mv = sum(
+        (_safe_float(h.get("qty")) or 0.0) * (_safe_float(h.get("current_price")) or 0.0)
+        for h in holdings
+    )
+    if not total_mv:
+        return None
+    weighted = sum(
+        (_safe_float(h.get("qty")) or 0.0)
+        * (_safe_float(h.get("current_price")) or 0.0)
+        * (_safe_float(h.get("month_return_pct")) or 0.0)
+        for h in holdings
+    )
+    return weighted / total_mv
+
+
+def _market_context_cards(
+    market: dict[str, Any],
+    packet: dict[str, Any],
+) -> list[dict[str, str]]:
+    """Return four market-context cards suitable for a JSON/frontend consumer.
+
+    Derives text from the same logic as ``_market_context`` so the two
+    representations stay in sync.
+    """
+    ctx = _market_context(packet)
+    return [
+        {"title": "Indian Markets", "body": ctx["indian"]},
+        {"title": "Global Markets", "body": ctx["global"]},
+        {"title": "Economy",        "body": ctx["economy"]},
+        {"title": "Outlook",        "body": ctx["outlook"]},
+    ]
+
+
+def build_report_data(packet: dict) -> dict:
+    """Shape the report packet into the JSON dict consumed by both the
+    Jinja HTML template and the /reports/{id}/data JSON endpoint.
+
+    Single source of truth for KPIs, sector allocation, top movers,
+    market context, next-steps cards, and the letter text.
+    """
+    client = packet.get("client") or {}
+    portfolio = packet.get("portfolio") or {}
+    holdings = packet.get("holdings") or []
+    market = packet.get("market") or {}
+
+    # ─── KPIs ──────────────────────────────────────────
+    portfolio_value_cr = _portfolio_value_cr(holdings)
+    return_mtd_pct = _portfolio_return_pct(holdings)
+    nifty_mtd_pct = _safe_float(market.get("nifty_mtd_pct"))
+    alpha_pct = (
+        return_mtd_pct - nifty_mtd_pct
+        if return_mtd_pct is not None and nifty_mtd_pct is not None
+        else None
+    )
+    kpis = {
+        "portfolio_value_cr": portfolio_value_cr,
+        "holdings_count": len(holdings),
+        "return_mtd_pct": return_mtd_pct,
+        "nifty_mtd_pct": nifty_mtd_pct,
+        "alpha_pct": alpha_pct,
+    }
+
+    # ─── v2 RM-perspective KPIs (null-discipline: None ≠ 0) ───
+    holdings_mv = sum(
+        (float(h.get("qty") or 0) * float(h.get("current_price") or 0))
+        for h in holdings
+    )
+    xirr = compute_xirr(packet.get("transactions") or [], current_value=holdings_mv)
+    risk = (client or {}).get("risk_profile")
+    kpis["absolute_gain"] = compute_absolute_gain(holdings)
+    kpis["xirr_pct"] = (xirr * 100.0) if xirr is not None else None
+    kpis["drift_pct"] = compute_drift(holdings, risk)
+    kpis["concentration_pct"] = compute_concentration(holdings)
+
+    # ─── Sector allocation ─────────────────────────────
+    sector_alloc_dict = _allocation_by_sector(holdings)  # returns {sector: pct}
+    sector_allocation = [
+        {"sector": s, "weight_pct": round(w, 2)}
+        for s, w in sorted(sector_alloc_dict.items(), key=lambda kv: -kv[1])
+    ]
+
+    # ─── Top movers ────────────────────────────────────
+    movers_sorted = sorted(
+        holdings,
+        key=lambda h: _safe_float(h.get("month_return_pct")) or 0,
+        reverse=True,
+    )
+    top_contributors = movers_sorted[:3]
+    top_detractors = list(reversed(movers_sorted[-3:]))
+
+    return {
+        "report_id": packet.get("report_id"),
+        "client_name": client.get("name"),
+        "month": packet.get("month"),
+        "currency": client.get("currency", "INR"),
+        "qa_score": packet.get("qa_score"),
+        "kpis": kpis,
+        "holdings": holdings,
+        "top_contributors": top_contributors,
+        "top_detractors": top_detractors,
+        "sector_allocation": sector_allocation,
+        "nav_series": packet.get("nav_series"),  # None until backfilled
+        "market_context": _market_context_cards(market, packet),
+        "next_steps": _next_steps(packet),
+        "letter_text": packet.get("letter_text") or packet.get("generated_text", ""),
+    }
+
+
 # ───────────────────────────────────────────────── public ──
 
 async def render_report_card(report_row: dict[str, Any]) -> str:
     """Render the rich HTML report card for one saved report."""
+    from services.context_builder import build_context_packet  # lazy — avoids yfinance at import time
+
     client_id = report_row.get("client_id")
     month = str(report_row.get("month") or "")
     letter_text = report_row.get("generated_text") or ""

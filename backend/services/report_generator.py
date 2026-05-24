@@ -29,8 +29,8 @@ from services.error_logger import log_error
 GENERATION_MODEL = "command-r-plus-08-2024"
 QA_MODEL = "command-r-08-2024"
 QA_THRESHOLD = 7
-COHERE_REQUEST_TIMEOUT = 45  # seconds
-COHERE_MAX_ATTEMPTS = 3
+COHERE_REQUEST_TIMEOUT = 600  # seconds — generous, lets slow Cohere calls finish
+COHERE_MAX_ATTEMPTS = 6  # more retries on transient TCP failures
 
 # Meta trailer sentinels — chosen to be very unlikely in real letter text.
 META_OPEN = "\n\n[[META]]"
@@ -90,44 +90,50 @@ def _cohere_client() -> cohere.Client | None:
 
 # ──────────────────────────────────────────────── QA scoring ──
 
-def _extract_score(raw: str) -> int:
-    """Parse Cohere's QA reply into an int score; defensive fallback."""
+def _extract_score_and_reasons(raw: str) -> dict[str, Any]:
+    """Parse {score, reasons} from Cohere's QA JSON response.
+
+    Returns {"score": 0, "reasons": []} on any parse failure.
+    """
     if not raw:
-        return 0
-    # Try strict JSON first.
+        return {"score": 0, "reasons": []}
     try:
         payload = json.loads(raw)
         score = int(payload.get("score", 0))
-        return max(0, min(10, score))
+        score = max(0, min(10, score))
+        reasons = payload.get("reasons") or []
+        if not isinstance(reasons, list):
+            reasons = []
+        reasons = [str(r)[:200] for r in reasons[:5]]
+        return {"score": score, "reasons": reasons}
     except (ValueError, TypeError, json.JSONDecodeError):
-        pass
-    # Fall back to first integer in the text.
-    m = re.search(r"\b(10|[1-9])\b", raw)
-    return int(m.group(1)) if m else 0
+        m = re.search(r"\b(10|[1-9])\b", raw)
+        score = int(m.group(1)) if m else 0
+        return {"score": score, "reasons": []}
 
 
-def _qa_blocking(client: cohere.Client, letter_text: str) -> int:
+def _qa_blocking(client: cohere.Client, letter_text: str) -> dict[str, Any]:
     resp = client.chat(
         model=QA_MODEL,
         message=_QA_PROMPT + letter_text[:8000],
         temperature=0.1,
-        max_tokens=120,
+        max_tokens=160,
     )
-    return _extract_score(getattr(resp, "text", "") or "")
+    return _extract_score_and_reasons(getattr(resp, "text", "") or "")
 
 
-async def run_qa_check(letter_text: str) -> int:
-    """Score the letter 1-10. Returns 0 if Cohere is unavailable."""
+async def run_qa_check(letter_text: str) -> dict[str, Any]:
+    """Score the letter. Returns {"score": int, "reasons": list[str]}."""
     client = _cohere_client()
     if client is None or not letter_text.strip():
-        return 0
+        return {"score": 0, "reasons": []}
     try:
         return await _with_retry(
             "qa_check", lambda: _qa_blocking(client, letter_text)
         )
     except Exception as exc:  # noqa: BLE001
         await log_error("qa_check", exc)
-        return 0
+        return {"score": 0, "reasons": []}
 
 
 # ──────────────────────────────────────────────── regenerate ──
@@ -189,13 +195,17 @@ async def generate_report_batch(
             "batch.generate", lambda: _regen_blocking(client, prompt)
         )
         text = (first_draft or "").strip()
-        qa_score = await run_qa_check(text) if text else 0
+        qa = await run_qa_check(text) if text else {"score": 0, "reasons": []}
+        qa_score = qa["score"]
+        qa_reasons = qa["reasons"]
 
         if text and qa_score and qa_score < QA_THRESHOLD:
             redraft = await regenerate_strict(context, qa_score)
             if redraft:
                 text = redraft
-                qa_score = await run_qa_check(text)
+                qa = await run_qa_check(text)
+                qa_score = qa["score"]
+                qa_reasons = qa["reasons"]
 
         report_id: str | None = None
         if text:
@@ -205,6 +215,7 @@ async def generate_report_batch(
                     month=month,
                     generated_text=text,
                     qa_score=qa_score,
+                    qa_reasons=qa_reasons,
                 )
             except Exception as exc:  # noqa: BLE001
                 await log_error(
@@ -314,14 +325,18 @@ async def generate_report_stream(
         yield f"\n\n[generation failed: {exc}]"
 
     final_text = streamed.strip()
-    qa_score = await run_qa_check(final_text) if final_text else 0
+    qa = await run_qa_check(final_text) if final_text else {"score": 0, "reasons": []}
+    qa_score = qa["score"]
+    qa_reasons = qa["reasons"]
 
     if final_text and qa_score and qa_score < QA_THRESHOLD:
         try:
             regenerated = await regenerate_strict(context, qa_score)
             if regenerated:
                 final_text = regenerated
-                qa_score = await run_qa_check(final_text)
+                qa = await run_qa_check(final_text)
+                qa_score = qa["score"]
+                qa_reasons = qa["reasons"]
                 # Emit the regenerated text as a single visible "redraft"
                 # block so the user can see we re-wrote it.
                 yield "\n\n— Redrafted for tone and specificity —\n\n"
@@ -337,6 +352,7 @@ async def generate_report_stream(
                 month=month,
                 generated_text=final_text,
                 qa_score=qa_score,
+                qa_reasons=qa_reasons,
             )
         except Exception as exc:  # noqa: BLE001
             await log_error(

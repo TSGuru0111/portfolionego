@@ -4,6 +4,7 @@ import { BookOpen, FileText, Rss } from 'lucide-react'
 import AgentsEditor from '../components/config/AgentsEditor.jsx'
 import FeedsEditor from '../components/config/FeedsEditor.jsx'
 import StyleSamplesEditor from '../components/config/StyleSamplesEditor.jsx'
+import BackLink from '../components/layout/BackLink'
 
 const SUBTABS = [
   {
@@ -35,6 +36,7 @@ export default function ConfigPage() {
 
   return (
     <div className="space-y-6">
+      <BackLink to="/dashboard" label="dashboard" />
       <div>
         <h1 className="font-serif text-2xl text-slate-900">Configuration</h1>
         <p className="text-sm text-slate-500 mt-1">
