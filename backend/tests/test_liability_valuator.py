@@ -1,3 +1,4 @@
+import pytest
 from datetime import date
 from services.valuators.liability_valuator import outstanding_balance, emi_for
 
@@ -45,6 +46,11 @@ def test_outstanding_after_full_tenor_is_zero():
         emi=None,
     )
     assert round(bal, 2) == 0.00
+
+
+def test_emi_zero_months_raises():
+    with pytest.raises(ValueError, match="months must be positive"):
+        emi_for(principal=1_000_000.0, rate=0.08, months=0)
 
 
 def test_explicit_emi_overrides_derivation():

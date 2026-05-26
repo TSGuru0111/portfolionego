@@ -5,6 +5,8 @@ from datetime import date
 
 def emi_for(principal: float, rate: float, months: int) -> float:
     """Closed-form EMI for a standard amortising loan."""
+    if months <= 0:
+        raise ValueError(f"months must be positive, got {months}")
     if rate == 0:
         return principal / months
     r = rate / 12.0
