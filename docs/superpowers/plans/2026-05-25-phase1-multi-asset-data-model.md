@@ -775,13 +775,13 @@ from services.valuators.fd_valuator import value_fd
 
 
 def test_simple_interest():
-    # 100000 @ 7% simple, 1 year
+    # 100000 @ 7% simple, 1 year (non-leap span for exact arithmetic)
     v = value_fd(
         principal=100000.0,
         rate=0.07,
-        start=date(2024, 1, 1),
+        start=date(2023, 1, 1),
         compounding="simple",
-        as_of=date(2025, 1, 1),
+        as_of=date(2024, 1, 1),
     )
     assert round(v, 2) == 107000.00
 
@@ -791,23 +791,23 @@ def test_quarterly_compounding_one_year():
     v = value_fd(
         principal=100000.0,
         rate=0.08,
-        start=date(2024, 1, 1),
+        start=date(2023, 1, 1),
         compounding="quarterly",
-        as_of=date(2025, 1, 1),
+        as_of=date(2024, 1, 1),
     )
     assert round(v, 2) == 108243.22
 
 
 def test_monthly_compounding_two_years():
+    # 50000 * (1 + 0.06/12) ** 24  — uses non-leap span so days/365 == 2.0
     v = value_fd(
         principal=50000.0,
         rate=0.06,
-        start=date(2023, 1, 1),
+        start=date(2022, 1, 1),
         compounding="monthly",
-        as_of=date(2025, 1, 1),
+        as_of=date(2024, 1, 1),
     )
-    # 50000 * (1 + 0.06/12) ** 24
-    assert round(v, 2) == 56357.50
+    assert round(v, 2) == 56357.99
 
 
 def test_as_of_before_start_returns_principal():
@@ -863,7 +863,7 @@ def value_fd(
     """
     if as_of <= start:
         return float(principal)
-    years = (as_of - start).days / 365.25
+    years = (as_of - start).days / 365.0
     if compounding == "simple":
         return float(principal * (1 + rate * years))
     n = _FREQ.get(compounding)
