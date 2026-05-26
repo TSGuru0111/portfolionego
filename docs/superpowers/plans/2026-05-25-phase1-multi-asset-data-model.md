@@ -383,195 +383,83 @@ git commit -m "docs(db): migration apply-order README"
 **Files:**
 - Create: `backend/models/wealth.py`
 
+Ships only the four bucket models that the Task 11 aggregator constructs.
+Per-asset Pydantic shapes (MutualFund, Bond, etc.) are deferred to Phase 3
+when an API surface actually needs them — Phase 1 reads rows as dicts.
+YAGNI: do not add unused models that will drift from the SQL.
+
 - [ ] **Step 1: Write the models file**
 
 Create `backend/models/wealth.py`:
 
 ```python
-"""Pydantic shapes for the Phase 1 multi-asset tables.
+"""Pydantic shapes for the wealth aggregator output.
 
-These are import-only for now (no routes use them yet). They exist so Phase 3
-can build the wealth API surface without re-typing fields.
+Phase 1 only ships the four bucket models the aggregator builds. Per-asset
+shapes (MutualFund, Bond, etc.) are deferred to Phase 3 when an API surface
+needs them. The aggregator reads DB rows as dicts.
 """
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Literal, Optional
-from uuid import UUID
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 
-SourceTag = Literal["live", "cached", "unavailable"]
-
-
-class MutualFund(BaseModel):
-    id: UUID
-    client_id: UUID
-    scheme_code: str
-    scheme_name: str
-    scheme_type: Literal["equity", "debt", "hybrid", "liquid"]
-    units: float
-    avg_cost_nav: float
-    invested_amount: float
-    sip_active: bool = False
-    sip_amount: Optional[float] = None
-    sip_start_date: Optional[date] = None
-    current_nav: Optional[float] = None
-    current_nav_date: Optional[date] = None
-    source: SourceTag = "unavailable"
-    created_at: datetime
-
-
-class Bond(BaseModel):
-    id: UUID
-    client_id: UUID
-    isin: str
-    bond_name: str
-    bond_type: Literal["gsec", "corp", "tax_free", "perpetual"]
-    face_value: float
-    units: float
-    coupon_rate: float
-    coupon_freq: Literal["annual", "semi"]
-    maturity_date: Optional[date] = None
-    purchase_date: date
-    purchase_price: float
-    current_price: Optional[float] = None
-    current_price_date: Optional[date] = None
-    source: SourceTag = "unavailable"
-    created_at: datetime
-
-
-class GoldHolding(BaseModel):
-    id: UUID
-    client_id: UUID
-    gold_type: Literal["physical", "sgb", "etf", "fund"]
-    grams: float
-    purity: Optional[Literal["24k", "22k", "18k"]] = None
-    purchase_date: date
-    purchase_price_per_gram: float
-    current_price_per_gram: Optional[float] = None
-    current_price_date: Optional[date] = None
-    source: SourceTag = "unavailable"
-    created_at: datetime
-
-
-class CashBalance(BaseModel):
-    id: UUID
-    client_id: UUID
-    account_type: Literal["savings", "sweep", "current"]
-    bank_name: str
-    balance: float
-    as_of_date: date
-    created_at: datetime
-
-
-class FixedDeposit(BaseModel):
-    id: UUID
-    client_id: UUID
-    bank_name: str
-    fd_number_last4: Optional[str] = None
-    principal: float
-    interest_rate: float
-    compounding: Literal["simple", "monthly", "quarterly", "annual"]
-    start_date: date
-    maturity_date: date
-    payout_type: Literal["cumulative", "payout"]
-    created_at: datetime
-
-
-class InsurancePolicy(BaseModel):
-    id: UUID
-    client_id: UUID
-    policy_type: Literal["term", "endowment", "ulip", "health", "whole_life"]
-    insurer: str
-    policy_number_last4: Optional[str] = None
-    sum_assured: float
-    premium_amount: float
-    premium_frequency: Literal["monthly", "quarterly", "annual"]
-    policy_start_date: date
-    maturity_date: Optional[date] = None
-    surrender_value: Optional[float] = None
-    current_nav: Optional[float] = None
-    units: Optional[float] = None
-    created_at: datetime
-
-
-class Liability(BaseModel):
-    id: UUID
-    client_id: UUID
-    loan_type: Literal["home", "car", "personal", "credit_card", "loan_against_securities"]
-    lender: str
-    sanctioned_amount: float
-    interest_rate: float
-    emi_amount: float
-    tenure_months: int
-    start_date: date
-    created_at: datetime
-
-
-class MarketYield(BaseModel):
-    date: date
-    tenor_years: int
-    yield_pct: float
-
-
-class NavCacheEntry(BaseModel):
-    scheme_code: str
-    nav: float
-    nav_date: date
-    fetched_at: datetime
-
-
-class GoldPriceCacheEntry(BaseModel):
-    gold_type: str
-    price_per_gram: float
-    source: SourceTag
-    fetched_at: datetime
+AssetClass = Literal[
+    "mutual_funds", "bonds", "gold", "cash", "fixed_deposits"
+]
 
 
 class AssetBucket(BaseModel):
-    holdings: list = Field(default_factory=list)
-    total_value: float = 0.0
-    source_health: dict = Field(default_factory=dict)
+    """One asset class for one client (MFs, bonds, gold, cash, FDs)."""
+    asset_class: AssetClass
+    holdings: list[dict[str, Any]] = Field(default_factory=list)
+    current_value: float = 0.0
+    invested_value: float = 0.0
+    unrealised_gain: float = 0.0
 
 
 class InsuranceBucket(BaseModel):
-    holdings: list = Field(default_factory=list)
-    total_surrender: float = 0.0
-    total_sum_assured: float = 0.0
+    """Insurance is special — cover and surrender are tracked separately."""
+    policies: list[dict[str, Any]] = Field(default_factory=list)
+    total_cover: float = 0.0
+    total_surrender_value: float = 0.0
 
 
 class LiabilityBucket(BaseModel):
-    holdings: list = Field(default_factory=list)
+    """All loans for one client."""
+    loans: list[dict[str, Any]] = Field(default_factory=list)
     total_outstanding: float = 0.0
 
 
 class WealthSnapshot(BaseModel):
-    equity: AssetBucket
-    mfs: AssetBucket
+    """Full multi-asset snapshot for one client at a point in time."""
+    client_id: str
+    as_of: str  # ISO date string
+    mutual_funds: AssetBucket
     bonds: AssetBucket
     gold: AssetBucket
     cash: AssetBucket
-    fds: AssetBucket
+    fixed_deposits: AssetBucket
     insurance: InsuranceBucket
     liabilities: LiabilityBucket
     net_worth: float
-    asset_allocation: dict
-    has_stale_values: bool
-    stale_sources: list[str]
+    asset_allocation: dict[str, float] = Field(default_factory=dict)
+    has_stale_values: bool = False
+    stale_sources: list[str] = Field(default_factory=list)
 ```
 
 - [ ] **Step 2: Verify it imports without error**
 
-Run: `python -c "from backend.models.wealth import WealthSnapshot; print('ok')"`
+Run: `cd backend && python -c "from models.wealth import WealthSnapshot, AssetBucket, InsuranceBucket, LiabilityBucket; print('ok')"`
 Expected: `ok`
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add backend/models/wealth.py
-git commit -m "feat(models): pydantic shapes for multi-asset tables"
+git commit -m "feat(models): wealth-snapshot bucket shapes (Phase 1)"
 ```
 
 ---
