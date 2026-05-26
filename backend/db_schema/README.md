@@ -2,11 +2,12 @@
 
 ## Apply order (one-time bootstrap)
 
-1. `schema.sql`             — base 10 tables
-2. `rls.sql`                — base RLS policies
-3. `seed.sql`               — 5 demo clients with equity holdings
-4. `migrations/002_multi_asset.sql`  — Phase 1 multi-asset tables + RLS
-5. `seed_v2.sql`            — Phase 1 multi-asset seed for the 5 demo clients
+1. `schema.sql`                       — base 10 tables
+2. `rls.sql`                          — base RLS policies
+3. `seed.sql`                         — 5 demo clients with equity holdings
+4. `migrations/001_qa_reasons.sql`    — adds `qa_reasons` JSONB to `reports` (additive)
+5. `migrations/002_multi_asset.sql`   — Phase 1 multi-asset tables + RLS
+6. `seed_v2.sql`                      — Phase 1 multi-asset seed for the 5 demo clients
 
 ## Rollback
 
