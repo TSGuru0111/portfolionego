@@ -12,12 +12,15 @@ from fastapi import APIRouter, HTTPException, Query
 
 from datetime import datetime, timezone
 
-from db import clients_db
+from db import clients_db, nav_cache_db, gold_price_cache_db
+from db import job_runs_db
 from db.cache_db import log_job_run
 from db.news_db import save_daily_news
 from services import report_generator
 from services.context_builder import build_context_packet
 from services.error_logger import log_error
+from services.feeds.amfi_nav import fetch_nav_rows
+from services.feeds.gold_price import fetch_gold_price_per_gram
 from services.news_fetcher import collect_daily_news
 from services.summariser import weekly_summarisation
 
@@ -159,3 +162,57 @@ async def generate_monthly(
             duration_ms=duration_ms,
         )
         raise HTTPException(500, f"Monthly generation failed: {exc}") from exc
+
+
+@router.get("/refresh-nav-cache")
+def refresh_nav_cache(secret: str = Query(...)) -> dict:
+    """Download AMFI NAVAll.txt and upsert all scheme NAVs into nav_cache."""
+    _verify_job_secret(secret)
+    started = time.monotonic()
+    try:
+        rows = fetch_nav_rows()
+        nav_cache_db.upsert(rows)
+        duration_ms = int((time.monotonic() - started) * 1000)
+        job_runs_db.insert({
+            "job_name": "refresh-nav-cache",
+            "status": "ok",
+            "records": len(rows),
+            "duration_ms": duration_ms,
+        })
+        return {"status": "ok", "records": len(rows), "duration_ms": duration_ms}
+    except Exception as exc:  # noqa: BLE001
+        duration_ms = int((time.monotonic() - started) * 1000)
+        job_runs_db.insert({
+            "job_name": "refresh-nav-cache",
+            "status": "error",
+            "records": 0,
+            "duration_ms": duration_ms,
+        })
+        raise HTTPException(500, f"NAV refresh failed: {exc}") from exc
+
+
+@router.get("/refresh-gold-price")
+def refresh_gold_price(secret: str = Query(...), purity: str = "999") -> dict:
+    """Scrape IBJA for the current gold rate and insert into gold_price_cache."""
+    _verify_job_secret(secret)
+    started = time.monotonic()
+    try:
+        row = fetch_gold_price_per_gram(purity=purity)
+        gold_price_cache_db.insert(row)
+        duration_ms = int((time.monotonic() - started) * 1000)
+        job_runs_db.insert({
+            "job_name": "refresh-gold-price",
+            "status": "ok",
+            "records": 1,
+            "duration_ms": duration_ms,
+        })
+        return {"status": "ok", "row": row, "duration_ms": duration_ms}
+    except Exception as exc:  # noqa: BLE001
+        duration_ms = int((time.monotonic() - started) * 1000)
+        job_runs_db.insert({
+            "job_name": "refresh-gold-price",
+            "status": "error",
+            "records": 0,
+            "duration_ms": duration_ms,
+        })
+        raise HTTPException(500, f"Gold price refresh failed: {exc}") from exc
