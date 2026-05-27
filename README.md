@@ -76,9 +76,12 @@ uvicorn main:app --reload
 Run the SQL files in order:
 
 ```
-backend/db_schema/schema.sql   # 10 tables
-backend/db_schema/rls.sql      # Row-level security policies
-backend/db_schema/seed.sql     # 5 synthetic HNI clients + portfolios + transactions
+backend/db_schema/schema.sql                      # 10 base tables
+backend/db_schema/rls.sql                         # Base row-level security policies
+backend/db_schema/seed.sql                        # 5 synthetic HNI clients + portfolios + transactions
+backend/db_schema/migrations/001_qa_reasons.sql   # adds qa_reasons JSONB to reports (additive)
+backend/db_schema/migrations/002_multi_asset.sql  # Phase 1 — 10 multi-asset tables + RLS
+backend/db_schema/seed_v2.sql                     # Phase 1 multi-asset rows for the same 5 clients
 ```
 
 ### 5. Frontend
@@ -209,6 +212,30 @@ VITE_API_URL=http://localhost:8000
   Once we add daily NAV snapshots, swap the synth for real series.
 - **QA score 0** means Cohere was unreachable, not "bad letter" — the badge
   hides itself when the score is null.
+
+---
+
+## Multi-Asset Data Model (Phase 1)
+
+Phase 1 ships the data + valuation layer for non-equity assets without touching
+the LLM context. Reports remain equity-only until Phase 3.
+
+- 10 new tables in `backend/db_schema/migrations/002_multi_asset.sql`:
+  `mutual_funds`, `bonds`, `gold_holdings`, `cash_balances`, `fixed_deposits`,
+  `insurance_policies`, `liabilities` (client-scoped) +
+  `market_yields`, `nav_cache`, `gold_price_cache` (support).
+- CRUD lives in `backend/db/{table}_db.py` — same singleton + `RuntimeError`
+  convention as existing modules.
+- Pure valuators in `backend/services/valuators/`:
+  `fd_valuator`, `bond_pricer`, `insurance_valuator`, `liability_valuator`.
+- Feeds in `backend/services/feeds/`: `amfi_nav` (NAVAll.txt parser),
+  `gold_price` (IBJA scraper). Refreshed by two new cron endpoints
+  `/jobs/refresh-nav-cache` and `/jobs/refresh-gold-price` (shared `JOB_SECRET`).
+- Integration point: `services.wealth_aggregator.build_wealth_snapshot(client_id, as_of)`
+  returns a `WealthSnapshot` (pydantic model in `models/wealth.py`). It is
+  **not** called from `context_builder.py` in Phase 1 — wire-in is Phase 3.
+- Seed: apply `seed.sql` first, then `seed_v2.sql` for multi-asset rows on the
+  5 demo clients.
 
 ---
 
