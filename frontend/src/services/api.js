@@ -306,6 +306,13 @@ export const api = {
   },
 
   // ─── RM Dashboard ───
+  getPortfolio: async (clientId) => {
+    const headers = await authHeader()
+    return jsonOrThrow(
+      await fetch(`${API}/clients/${clientId}/portfolio`, { headers }),
+    )
+  },
+
   getDrift: async (clientId) => {
     const headers = await authHeader()
     return jsonOrThrow(await fetch(`${API}/clients/${clientId}/drift`, { headers }))
