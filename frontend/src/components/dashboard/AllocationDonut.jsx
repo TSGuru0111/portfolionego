@@ -40,12 +40,12 @@ export default function AllocationDonut({ drift, loading, error }) {
         <PieChart>
           <Pie data={target} dataKey="value" cx="50%" cy="50%" innerRadius={40} outerRadius={65} strokeWidth={0}>
             {target.map((entry) => (
-              <Cell key={entry.name} fill={COLOURS[entry.name] ?? '#94a3b8'} opacity={0.35} />
+              <Cell key={`t-${entry.name}`} fill={COLOURS[entry.name] ?? '#94a3b8'} opacity={0.35} />
             ))}
           </Pie>
           <Pie data={actual} dataKey="value" cx="50%" cy="50%" innerRadius={68} outerRadius={90} strokeWidth={0}>
             {actual.map((entry) => (
-              <Cell key={entry.name} fill={COLOURS[entry.name] ?? '#94a3b8'} />
+              <Cell key={`a-${entry.name}`} fill={COLOURS[entry.name] ?? '#94a3b8'} />
             ))}
           </Pie>
           <Tooltip formatter={(v) => `${v.toFixed(1)}%`} />

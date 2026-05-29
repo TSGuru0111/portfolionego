@@ -37,21 +37,27 @@ export default function DriftBars({ drift, loading, error }) {
     <div>
       <h2 className="text-sm font-semibold text-gray-700 mb-3">Drift Status</h2>
       <div className="space-y-3">
-        {drift.map((d) => (
+        {drift.map((d) => {
+          const actual = Number(d.actual_pct);
+          const target = Number(d.target_pct);
+          const delta  = Number(d.delta_pct);
+          const band   = Number(d.band_pct);
+          return (
           <div key={d.asset_class}>
             <div className="flex justify-between items-center mb-1">
               <span className="text-xs text-gray-600 capitalize w-24">{d.asset_class}</span>
-              <span className="text-xs text-gray-400">{d.actual_pct.toFixed(0)}% / {d.target_pct.toFixed(0)}%</span>
-              <StatusLabel delta={d.delta_pct} band={d.band_pct} />
+              <span className="text-xs text-gray-400">{actual.toFixed(0)}% / {target.toFixed(0)}%</span>
+              <StatusLabel delta={delta} band={band} />
             </div>
             <div className="w-full bg-gray-100 rounded-full h-2.5">
               <div
-                className={`h-2.5 rounded-full ${barBgColour(d.delta_pct, d.band_pct)}`}
-                style={{ width: `${Math.min(Math.max(d.actual_pct, 0), 100)}%`, backgroundColor: COLOURS[d.asset_class] }}
+                className={`h-2.5 rounded-full ${barBgColour(delta, band)}`}
+                style={{ width: `${Math.min(Math.max(actual, 0), 100)}%`, backgroundColor: COLOURS[d.asset_class] }}
               />
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

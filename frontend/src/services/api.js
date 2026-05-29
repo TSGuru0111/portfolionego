@@ -318,17 +318,19 @@ export const api = {
     return jsonOrThrow(await fetch(`${API}/clients/${clientId}/drift`, { headers }))
   },
 
-  getSnapshots: async (clientId, limit = 12) => {
+  getSnapshots: async (clientId) => {
     const headers = await authHeader()
+    const to = new Date().toISOString().slice(0, 10)
+    const from = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10)
     return jsonOrThrow(
-      await fetch(`${API}/clients/${clientId}/snapshots?limit=${limit}`, { headers }),
+      await fetch(`${API}/clients/${clientId}/snapshots?from=${from}&to=${to}`, { headers }),
     )
   },
 
   getRationaleEvents: async (clientId) => {
     const headers = await authHeader()
     return jsonOrThrow(
-      await fetch(`${API}/clients/${clientId}/rationale-events`, { headers }),
+      await fetch(`${API}/clients/${clientId}/rationale-events?from=2020-01-01&to=2099-01-01`, { headers }),
     )
   },
 
