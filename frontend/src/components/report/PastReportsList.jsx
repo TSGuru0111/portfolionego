@@ -66,6 +66,13 @@ export default function PastReportsList({ clientId }) {
                   {formatDateIN(r.created_at)}
                 </span>
               </Link>
+              {r.cadence && r.cadence !== 'monthly' && (
+                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
+                  r.cadence === 'weekly' ? 'bg-sky-100 text-sky-700' : 'bg-purple-100 text-purple-700'
+                }`}>
+                  {r.cadence === 'weekly' ? 'W' : 'Q'}
+                </span>
+              )}
               <QAScoreBadge score={r.qa_score} />
             </li>
           ))}

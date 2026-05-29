@@ -27,11 +27,20 @@ export default function ClientDetail() {
   const { id } = useParams()
   const { data: portfolio, loading, error } = usePortfolio(id)
   const [month, setMonth] = useState(defaultMonth())
+  const [cadence, setCadence] = useState('monthly')
 
-  const newReportHref = useMemo(
-    () => `/clients/${id}/report/new?month=${month}`,
-    [id, month],
-  )
+  const newReportHref = useMemo(() => {
+    if (cadence === 'weekly') {
+      return `/clients/${id}/report/new?cadence=weekly`
+    }
+    if (cadence === 'quarterly') {
+      const now = new Date()
+      const q = Math.floor(now.getMonth() / 3) + 1
+      const quarter = `Q${q} ${now.getFullYear()}`
+      return `/clients/${id}/report/new?cadence=quarterly&month=${encodeURIComponent(quarter)}`
+    }
+    return `/clients/${id}/report/new?cadence=monthly&month=${month}`
+  }, [id, cadence, month])
 
   if (loading) {
     return (
@@ -113,15 +122,31 @@ export default function ClientDetail() {
         <div className="flex items-end gap-2">
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
-              Report month
+              Report type
             </label>
-            <input
-              type="month"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="text-sm border border-slate-300 rounded-lg px-3 py-2"
-            />
+            <select
+              value={cadence}
+              onChange={(e) => setCadence(e.target.value)}
+              className="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="weekly">Weekly digest</option>
+              <option value="monthly">Monthly letter</option>
+              <option value="quarterly">Quarterly review</option>
+            </select>
           </div>
+          {cadence !== 'weekly' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Report month
+              </label>
+              <input
+                type="month"
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="text-sm border border-slate-300 rounded-lg px-3 py-2"
+              />
+            </div>
+          )}
           <Link to={newReportHref}>
             <Button>
               <FileText className="w-4 h-4 mr-1" />
