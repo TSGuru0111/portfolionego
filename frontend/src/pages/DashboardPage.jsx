@@ -8,6 +8,7 @@ import DriftBars from '../components/dashboard/DriftBars';
 import NetWorthSparkline from '../components/dashboard/NetWorthSparkline';
 import RationaleTimeline from '../components/dashboard/RationaleTimeline';
 import EditTargetsModal from '../components/dashboard/EditTargetsModal';
+import ShareModal from '../components/dashboard/ShareModal';
 
 function useAsync(fn, deps) {
   const [data, setData] = useState(null);
@@ -41,6 +42,7 @@ export default function DashboardPage() {
   const target    = useAsync(() => api.getAllocationTarget(id), [id]);
 
   const [showEditTargets, setShowEditTargets] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   const clientName = portfolio.data?.client?.name ?? 'Client';
 
@@ -51,6 +53,12 @@ export default function DashboardPage() {
         <Link to={`/clients/${id}`} className="text-blue-600 hover:underline text-sm flex items-center gap-1">
           ← {clientName}
         </Link>
+        <button
+          onClick={() => setShowShare(true)}
+          className="text-sm px-3 py-1.5 rounded-lg border border-blue-600 text-blue-600 font-medium hover:bg-blue-50"
+        >
+          Share with client
+        </button>
         <Link
           to={`/clients/${id}/report/new`}
           className="text-sm px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
@@ -126,6 +134,14 @@ export default function DashboardPage() {
             target.refetch();
             events.refetch();
           }}
+        />
+      )}
+
+      {/* Share with client modal */}
+      {showShare && (
+        <ShareModal
+          clientId={id}
+          onClose={() => setShowShare(false)}
         />
       )}
     </div>
