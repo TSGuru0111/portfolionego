@@ -4,7 +4,7 @@ from datetime import datetime
 import httpx
 
 
-AMFI_URL = "https://www.amfiindia.com/spages/NAVAll.txt"
+AMFI_URL = "https://portal.amfiindia.com/spages/NAVAll.txt"
 
 
 def _parse_date(s: str) -> str:
