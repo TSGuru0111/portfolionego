@@ -30,9 +30,8 @@ def _sb(data):
 def test_insert_returns_row():
     row = {"id": "ev-1", "event_type": "rebalance"}
     chain = _chain(row)
-    chain.single.return_value = chain
     single_res = MagicMock()
-    single_res.data = row
+    single_res.data = [row]
     chain.execute.return_value = single_res
     sb = MagicMock()
     sb.table.return_value = chain

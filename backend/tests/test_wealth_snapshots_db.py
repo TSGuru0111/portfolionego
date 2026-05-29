@@ -41,9 +41,8 @@ def test_get_latest_returns_none_when_empty():
 
 def test_insert_returns_id():
     chain = _chain([{"id": "snap-new"}])
-    chain.single.return_value = chain
     single_res = MagicMock()
-    single_res.data = {"id": "snap-new"}
+    single_res.data = [{"id": "snap-new"}]
     chain.execute.return_value = single_res
 
     sb = MagicMock()
