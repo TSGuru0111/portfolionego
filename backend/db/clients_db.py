@@ -104,3 +104,15 @@ async def get_transactions(
         .execute()
     )
     return res.data or []
+
+
+def list_all_clients(sb=None) -> list[dict]:
+    """Return every client row (id only). Service-role only — used by cron."""
+    from db.supabase_client import get_supabase
+    if sb is None:
+        sb = get_supabase()
+    if sb is None:
+        return []
+    resp = sb.table("clients").select("id").execute()
+    return resp.data or []
+

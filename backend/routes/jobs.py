@@ -216,3 +216,44 @@ def refresh_gold_price(secret: str = Query(...), purity: str = "999") -> dict:
             "duration_ms": duration_ms,
         })
         raise HTTPException(500, f"Gold price refresh failed: {exc}") from exc
+
+
+# ─── Phase 2: monthly snapshots cron ─────────────────────────────────────────
+# EasyCron schedule:
+#   URL:      https://<host>/jobs/monthly-snapshots?secret=$JOB_SECRET
+#   Cron:     30 0 1 * *
+#   Timezone: Asia/Kolkata
+#   Retries:  3 (EasyCron-side)
+
+from db.clients_db import list_all_clients
+from services.snapshot_service import persist_snapshot as _persist_snapshot
+
+
+@router.post("/monthly-snapshots")
+async def monthly_snapshots(secret: str = Query(...)):
+    """Iterate every client and write a 'monthly' wealth snapshot."""
+    _verify_job_secret(secret)
+
+    from db.supabase_client import get_supabase
+    sb = get_supabase()
+
+    clients = list_all_clients(sb)
+    ok = 0
+    failed = 0
+
+    for c in clients:
+        cid = c["id"]
+        try:
+            _persist_snapshot(sb, client_id=cid, trigger="monthly")
+            ok += 1
+        except Exception as exc:  # noqa: BLE001
+            failed += 1
+            await log_error(job="cron.monthly-snapshots", error=exc, context={"client_id": cid})
+
+    summary = {"clients_total": len(clients), "ok": ok, "failed": failed}
+    await log_job_run(
+        job_name="monthly-snapshots",
+        status="ok" if failed == 0 else "partial",
+        records=ok,
+    )
+    return summary
