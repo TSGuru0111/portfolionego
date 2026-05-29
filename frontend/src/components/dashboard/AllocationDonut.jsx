@@ -12,11 +12,11 @@ const COLOURS = {
 function buildSlices(drift) {
   if (!Array.isArray(drift) || drift.length === 0) return { actual: [], target: [] };
   const actual = drift.map((d) => ({
-    name: d.asset_class,
+    name: d.class,
     value: Math.max(d.actual_pct, 0),
   }));
   const target = drift.map((d) => ({
-    name: d.asset_class,
+    name: d.class,
     value: Math.max(d.target_pct, 0),
   }));
   return { actual, target };

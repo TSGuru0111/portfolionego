@@ -27,7 +27,7 @@ export default function NetWorthSparkline({ snapshots, loading, error }) {
 
   const data = [...snapshots]
     .sort((a, b) => new Date(a.as_of) - new Date(b.as_of))
-    .map((s) => ({ month: formatMonth(s.as_of), aum: s.total_aum, date: s.as_of }));
+    .map((s) => ({ month: formatMonth(s.as_of), aum: Number(s.net_worth), date: s.as_of }));
 
   return (
     <div>
@@ -48,7 +48,7 @@ export default function NetWorthSparkline({ snapshots, loading, error }) {
             width={60}
           />
           <Tooltip
-            formatter={(v) => [formatCr(v), 'AUM']}
+            formatter={(v) => [formatCr(v), 'Net Worth']}
             labelFormatter={(label, payload) => payload?.[0]?.payload?.date ?? label}
           />
           <Area

@@ -1,7 +1,6 @@
-function formatAum(aum) {
-  if (!aum && aum !== 0) return '—';
-  const cr = aum / 1e7;
-  return `₹${cr.toFixed(2)} Cr`;
+function formatAum(aumCr) {
+  if (!aumCr && aumCr !== 0) return '—';
+  return `₹${Number(aumCr).toFixed(2)} Cr`;
 }
 
 function daysAgo(dateStr) {
@@ -13,7 +12,7 @@ function daysAgo(dateStr) {
 }
 
 export default function DashboardKpiStrip({ portfolio, drift, rationaleEvents }) {
-  const aum = portfolio?.total_aum;
+  const aum = portfolio?.client?.aum_cr;
 
   const driftBreaches = Array.isArray(drift)
     ? drift.filter((d) => d.status !== 'on_track').length
