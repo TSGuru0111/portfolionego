@@ -15,7 +15,7 @@ function truncate(str, n) {
   return str.length > n ? str.slice(0, n) + '…' : str;
 }
 
-export default function RationaleTimeline({ clientId, events, loading, error, onEventLogged }) {
+export default function RationaleTimeline({ clientId, events, loading, error, onEventLogged, readOnly = false }) {
   const [showModal, setShowModal] = useState(false);
 
   const sorted = Array.isArray(events)
@@ -26,10 +26,12 @@ export default function RationaleTimeline({ clientId, events, loading, error, on
     <div>
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-sm font-semibold text-gray-700">Rationale Timeline</h2>
-        <button onClick={() => setShowModal(true)}
-          className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700">
-          + Log change
-        </button>
+        {!readOnly && (
+          <button onClick={() => setShowModal(true)}
+            className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700">
+            + Log change
+          </button>
+        )}
       </div>
 
       {loading && <div className="text-gray-400 text-sm py-4">Loading…</div>}
@@ -60,7 +62,7 @@ export default function RationaleTimeline({ clientId, events, loading, error, on
         </div>
       )}
 
-      {showModal && (
+      {!readOnly && showModal && (
         <LogChangeModal
           clientId={clientId}
           onClose={() => setShowModal(false)}

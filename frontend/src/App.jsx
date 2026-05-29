@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import AdminPage from './pages/AdminPage.jsx'
 import ClientDetail from './pages/ClientDetail.jsx'
+import ClientSharePage from './pages/ClientSharePage.jsx'
 import ConfigPage from './pages/ConfigPage.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
@@ -13,6 +14,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/share/:token" element={<ClientSharePage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Dashboard />} />

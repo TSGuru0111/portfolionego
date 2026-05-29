@@ -360,4 +360,22 @@ export const api = {
       }),
     )
   },
+
+  createShareToken: async (clientId, expiresInDays) => {
+    const headers = await authHeader()
+    return jsonOrThrow(
+      await fetch(`${API}/clients/${clientId}/share-token`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expires_in_days: expiresInDays }),
+      }),
+    )
+  },
+
+  getShareToken: async (clientId) => {
+    const headers = await authHeader()
+    return jsonOrThrow(
+      await fetch(`${API}/clients/${clientId}/share-token`, { headers }),
+    )
+  },
 }
