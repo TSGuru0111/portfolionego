@@ -4,11 +4,8 @@ from services.feeds.gold_price import parse_ibja_html, fetch_gold_price_per_gram
 
 _SAMPLE_HTML = """
 <html><body>
-<table id="ratesTable">
-<tr><td>Fine Gold (999)</td><td>7234.50</td></tr>
-<tr><td>22 Karat (916)</td><td>6627.20</td></tr>
-<tr><td>Silver (999)</td><td>89.10</td></tr>
-</table>
+<span id="lblFineGold999">₹ 7234.50</span>
+<span id="lblKarat22">₹ 6627.20</span>
 </body></html>
 """
 
