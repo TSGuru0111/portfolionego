@@ -163,9 +163,109 @@ def _extract_rationale_trades(
     return picked
 
 
+# ─── Phase 3A: change-summary ─────────────────────────────────────────────────
+
+_CHANGE_SUMMARY_CAP = 500
+_RATIONALE_INLINE_CAP = 120
+_CADENCE_WINDOW: dict[str, int] = {"weekly": 7, "monthly": 30, "quarterly": 90}
+
+
+def _fetch_events_in_window(sb, client_id: str, window_days: int) -> list[dict]:
+    from datetime import date, timedelta
+    from_date = str(date.today() - timedelta(days=window_days))
+    res = (
+        sb.table("rationale_events")
+        .select("event_date,title,rationale_text")
+        .eq("client_id", str(client_id))
+        .gte("event_date", from_date)
+        .order("event_date", desc=False)
+        .execute()
+    )
+    return res.data or []
+
+
+def _fetch_latest_snapshot(sb, client_id: str) -> dict | None:
+    res = (
+        sb.table("wealth_snapshots")
+        .select("allocation_pct")
+        .eq("client_id", str(client_id))
+        .order("as_of", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return res.data[0] if res.data else None
+
+
+def _fetch_active_target(sb, client_id: str) -> dict | None:
+    res = (
+        sb.table("allocation_targets")
+        .select(
+            "equity_pct,debt_pct,gold_pct,cash_pct,alternatives_pct,"
+            "equity_band_pct,debt_band_pct,gold_band_pct,"
+            "cash_band_pct,alternatives_band_pct"
+        )
+        .eq("client_id", str(client_id))
+        .is_("effective_to", "null")
+        .limit(1)
+        .execute()
+    )
+    return res.data[0] if res.data else None
+
+
+def _build_drift_line(snapshot: dict, target: dict) -> str:
+    allocation = snapshot.get("allocation_pct") or {}
+    parts: list[str] = []
+    for cls in ("equity", "debt", "gold", "cash", "alternatives"):
+        try:
+            actual_pct = float(allocation.get(cls, 0)) * 100  # 0..1 -> 0..100
+            target_pct = float(target.get(f"{cls}_pct", 0))
+            band_pct = float(target.get(f"{cls}_band_pct", 5))
+        except (ValueError, TypeError):
+            continue
+        delta = actual_pct - target_pct
+        if delta > band_pct:
+            parts.append(f"{cls} +{delta:.0f}% over target")
+        elif delta < -band_pct:
+            parts.append(f"{cls} {delta:.0f}% under target")
+        else:
+            parts.append(f"{cls} on track")
+    return ("Current allocation: " + ", ".join(parts) + ".") if parts else ""
+
+
+def build_change_summary(sb, client_id: str, window_days: int) -> str:
+    """Return <=500-char plain-text change summary. Returns '' if no events."""
+    events = _fetch_events_in_window(sb, client_id, window_days)
+    if not events:
+        return ""
+    snapshot = _fetch_latest_snapshot(sb, client_id)
+    target = _fetch_active_target(sb, client_id)
+    lines: list[str] = ["Portfolio changes since last review:"]
+    skipped = 0
+    for ev in events:
+        ev_date = str(ev.get("event_date", ""))[:10]
+        title = (ev.get("title") or "").strip()
+        rat = (ev.get("rationale_text") or "").strip()
+        if len(rat) > _RATIONALE_INLINE_CAP:
+            rat = rat[:_RATIONALE_INLINE_CAP].rstrip() + "..."
+        candidate = f"[{ev_date}] {title} -- {rat}"
+        used = sum(len(line) + 1 for line in lines)
+        if used + len(candidate) + 80 > _CHANGE_SUMMARY_CAP:
+            skipped = len(events) - (len(lines) - 1)
+            break
+        lines.append(candidate)
+    if skipped:
+        lines.append(f"...and {skipped} more event{'s' if skipped > 1 else ''}.")
+    if snapshot and target:
+        drift = _build_drift_line(snapshot, target)
+        if drift:
+            lines.append(drift)
+    return "\n".join(lines)[:_CHANGE_SUMMARY_CAP]
+
+
 async def build_context_packet(
     client_id: str,
     month: str,
+    cadence: str = "monthly",
 ) -> dict[str, Any]:
     """Assemble the full context packet for one client/month.
 
@@ -238,6 +338,13 @@ async def build_context_packet(
     transactions = _sanitise_transactions(transactions)
     rationale_trades = _extract_rationale_trades(transactions)
 
+    window_days = _CADENCE_WINDOW.get(cadence, 30)
+    try:
+        from db.supabase_client import get_supabase as _get_sb
+        change_summary = build_change_summary(_get_sb(), client_id, window_days)
+    except Exception:  # noqa: BLE001
+        change_summary = ""
+
     packet: dict[str, Any] = {
         "client": _sanitise_client(client),
         "portfolio": {k: v for k, v in portfolio_row.items() if k != "holdings"},
@@ -252,6 +359,8 @@ async def build_context_packet(
         "weekly_summaries": weekly_summaries,
         "transactions": transactions,
         "rationale_trades": rationale_trades,
+        "change_summary": change_summary,
+        "cadence": cadence,
         "has_stale_prices": bool(stale),
         "stale_tickers": stale,
         "month": month,
