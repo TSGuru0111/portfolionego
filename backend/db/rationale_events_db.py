@@ -29,8 +29,8 @@ def insert_rationale_event(
         "rationale_text": body,
         "created_by_rm_id": str(author_rm_id),
     }
-    res = sb.table(_TABLE).insert(row).select("*").single().execute()
-    return res.data
+    res = sb.table(_TABLE).insert(row).execute()
+    return res.data[0]
 
 
 def update_snapshot_id(sb, event_id: str, snapshot_id: str) -> None:
