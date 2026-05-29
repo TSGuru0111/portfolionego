@@ -7,6 +7,7 @@ import AllocationDonut from '../components/dashboard/AllocationDonut';
 import DriftBars from '../components/dashboard/DriftBars';
 import NetWorthSparkline from '../components/dashboard/NetWorthSparkline';
 import RationaleTimeline from '../components/dashboard/RationaleTimeline';
+import EditTargetsModal from '../components/dashboard/EditTargetsModal';
 
 function useAsync(fn, deps) {
   const [data, setData] = useState(null);
@@ -33,10 +34,13 @@ function useAsync(fn, deps) {
 export default function DashboardPage() {
   const { id } = useParams();
 
-  const portfolio  = useAsync(() => api.getPortfolio(id), [id]);
-  const drift      = useAsync(() => api.getDrift(id), [id]);
-  const snapshots  = useAsync(() => api.getSnapshots(id, 12), [id]);
-  const events     = useAsync(() => api.getRationaleEvents(id), [id]);
+  const portfolio = useAsync(() => api.getPortfolio(id), [id]);
+  const drift     = useAsync(() => api.getDrift(id), [id]);
+  const snapshots = useAsync(() => api.getSnapshots(id, 12), [id]);
+  const events    = useAsync(() => api.getRationaleEvents(id), [id]);
+  const target    = useAsync(() => api.getAllocationTarget(id), [id]);
+
+  const [showEditTargets, setShowEditTargets] = useState(false);
 
   const clientName = portfolio.data?.client?.name ?? 'Client';
 
@@ -65,8 +69,17 @@ export default function DashboardPage() {
 
         {/* Two-column grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Left: Donut + Drift */}
+          {/* Left: Donut + Drift + Edit targets button */}
           <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-6">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-400">Allocation vs target</span>
+              <button
+                onClick={() => setShowEditTargets(true)}
+                className="text-xs px-3 py-1.5 rounded-lg border border-blue-600 text-blue-600 font-medium hover:bg-blue-50"
+              >
+                Edit targets
+              </button>
+            </div>
             <AllocationDonut
               drift={drift.data}
               loading={drift.loading}
@@ -100,6 +113,21 @@ export default function DashboardPage() {
           />
         </div>
       </div>
+
+      {/* Edit targets modal */}
+      {showEditTargets && (
+        <EditTargetsModal
+          clientId={id}
+          currentTarget={target.data}
+          onClose={() => setShowEditTargets(false)}
+          onSuccess={() => {
+            setShowEditTargets(false);
+            drift.refetch();
+            target.refetch();
+            events.refetch();
+          }}
+        />
+      )}
     </div>
   );
 }

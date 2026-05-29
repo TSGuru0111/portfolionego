@@ -342,4 +342,22 @@ export const api = {
       }),
     )
   },
+
+  getAllocationTarget: async (clientId) => {
+    const headers = await authHeader()
+    return jsonOrThrow(
+      await fetch(`${API}/clients/${clientId}/allocation-target`, { headers }),
+    )
+  },
+
+  putAllocationTarget: async (clientId, body) => {
+    const headers = await authHeader()
+    return jsonOrThrow(
+      await fetch(`${API}/clients/${clientId}/allocation-target`, {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+    )
+  },
 }
