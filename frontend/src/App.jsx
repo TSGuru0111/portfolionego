@@ -4,6 +4,7 @@ import AdminPage from './pages/AdminPage.jsx'
 import ClientDetail from './pages/ClientDetail.jsx'
 import ConfigPage from './pages/ConfigPage.jsx'
 import Dashboard from './pages/Dashboard.jsx'
+import DashboardPage from './pages/DashboardPage.jsx'
 import Login from './pages/Login.jsx'
 import ReportPage from './pages/ReportPage.jsx'
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx'
@@ -16,6 +17,7 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/clients/:id" element={<ClientDetail />} />
+        <Route path="/clients/:id/dashboard" element={<DashboardPage />} />
         <Route path="/clients/:id/report/:reportId" element={<ReportPage />} />
         <Route path="/config" element={<ConfigPage />} />
         <Route path="/admin" element={<AdminPage />} />

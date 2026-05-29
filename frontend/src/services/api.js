@@ -305,3 +305,33 @@ export const api = {
     )
   },
 }
+
+// ─── RM Dashboard helpers ───
+
+export async function getDrift(clientId) {
+  const headers = await authHeader()
+  const res = await fetch(`${API}/clients/${clientId}/drift`, { headers })
+  return jsonOrThrow(res)
+}
+
+export async function getSnapshots(clientId, limit = 12) {
+  const headers = await authHeader()
+  const res = await fetch(`${API}/clients/${clientId}/snapshots?limit=${limit}`, { headers })
+  return jsonOrThrow(res)
+}
+
+export async function getRationaleEvents(clientId) {
+  const headers = await authHeader()
+  const res = await fetch(`${API}/clients/${clientId}/rationale-events`, { headers })
+  return jsonOrThrow(res)
+}
+
+export async function logRationaleEvent(clientId, payload) {
+  const headers = await authHeader()
+  const res = await fetch(`${API}/clients/${clientId}/rationale-events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(payload),
+  })
+  return jsonOrThrow(res)
+}

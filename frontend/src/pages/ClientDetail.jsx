@@ -153,6 +153,12 @@ export default function ClientDetail() {
               Generate report
             </Button>
           </Link>
+          <Link
+            to={`/clients/${id}/dashboard`}
+            className="ml-2 px-3 py-1.5 text-sm font-medium rounded border border-blue-600 text-blue-600 hover:bg-blue-50"
+          >
+            Dashboard →
+          </Link>
         </div>
       </div>
 
