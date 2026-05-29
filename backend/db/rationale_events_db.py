@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.db.supabase_client import get_supabase
+from db.supabase_client import get_supabase
 
 _TABLE = "rationale_events"
 

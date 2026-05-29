@@ -1,0 +1,14 @@
+[
+  {
+    "id": "task-task-10-ibja-gold-scraper",
+    "key": "task-10-ibja-gold-scraper",
+    "content": "Task completed: task-10-ibja-gold-scraper",
+    "namespace": "tasks",
+    "type": "task-outcome",
+    "metadata": {
+      "success": true,
+      "quality": 0.85
+    },
+    "createdAt": 1779814231702
+  }
+]

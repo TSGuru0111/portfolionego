@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from backend.db.wealth_snapshots_db import (
+from db.wealth_snapshots_db import (
     get_latest_snapshot,
     get_snapshots_range,
     insert_snapshot,

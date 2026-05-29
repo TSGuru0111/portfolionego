@@ -4,8 +4,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from backend.db.allocation_targets_db import get_active_target
-from backend.db.wealth_snapshots_db import get_latest_snapshot
+from db.allocation_targets_db import get_active_target
+from db.wealth_snapshots_db import get_latest_snapshot
 
 _CLASSES = ("equity", "debt", "gold", "cash", "alternatives")
 _HUNDRED = Decimal("100")

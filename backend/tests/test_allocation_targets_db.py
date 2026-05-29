@@ -4,7 +4,7 @@ from __future__ import annotations
 from decimal import Decimal
 from unittest.mock import MagicMock
 
-from backend.db.allocation_targets_db import (
+from db.allocation_targets_db import (
     change_allocation_target,
     get_active_target,
     get_target_history,

@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from backend.models.allocation_target import AllocationTarget, AllocationTargetWrite
+from models.allocation_target import AllocationTarget, AllocationTargetWrite
 
 
 def _body(**overrides):

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from backend.db.rationale_events_db import (
+from db.rationale_events_db import (
     insert_rationale_event,
     list_rationale_events,
     update_snapshot_id,

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from backend.services.allocation_rollup import roll_up_to_classes
+from services.allocation_rollup import roll_up_to_classes
 
 
 class _Holding:

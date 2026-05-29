@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from backend.services import drift_service
-from backend.services.drift_service import compute_drift
+from services import drift_service
+from services.drift_service import compute_drift
 
 
 def _sb():

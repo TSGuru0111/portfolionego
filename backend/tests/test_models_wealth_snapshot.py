@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from backend.models.wealth_snapshot import WealthSnapshotRow
+from models.wealth_snapshot import WealthSnapshotRow
 
 
 def _row(**overrides):

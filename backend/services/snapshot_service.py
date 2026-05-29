@@ -5,9 +5,9 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from backend.db.wealth_snapshots_db import insert_snapshot
-from backend.services.allocation_rollup import roll_up_to_classes
-from backend.services.wealth_aggregator import build_wealth_snapshot
+from db.wealth_snapshots_db import insert_snapshot
+from services.allocation_rollup import roll_up_to_classes
+from services.wealth_aggregator import build_wealth_snapshot
 
 _VALID_TRIGGERS = {"report", "rationale", "monthly"}
 

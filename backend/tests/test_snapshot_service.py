@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.services import snapshot_service
+from services import snapshot_service
 
 
 def _make_snap():

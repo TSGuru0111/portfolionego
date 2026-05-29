@@ -4,7 +4,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from backend.db.supabase_client import get_supabase
+from db.supabase_client import get_supabase
 
 _TABLE = "allocation_targets"
 
