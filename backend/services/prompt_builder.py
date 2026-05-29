@@ -24,6 +24,18 @@ from typing import Any
 
 from services import config_store
 
+_CADENCE_WINDOW_LABEL: dict[str, str] = {
+    "weekly": "this week",
+    "monthly": "this month",
+    "quarterly": "this quarter",
+}
+
+
+def _change_summary_block(context: dict[str, Any]) -> str | None:
+    summary = (context.get("change_summary") or "").strip()
+    return ("PORTFOLIO CHANGES SINCE LAST REVIEW:\n" + summary) if summary else None
+
+
 BANNED_PHRASES: list[str] = [
     "market volatility",
     "challenging environment",
@@ -155,10 +167,11 @@ def _serialise_context(context: dict[str, Any]) -> str:
     return json.dumps(context, default=str, ensure_ascii=False, indent=2)
 
 
-def _task_block(strict: bool, note: str = "") -> str:
+def _task_block(strict: bool, note: str = "", cadence: str = "monthly") -> str:
+    window_label = _CADENCE_WINDOW_LABEL.get(cadence, "this month")
     base = (
         "Write the letter for the client described in the CONTEXT PACKET "
-        "above. Follow the 7-section LETTER STRUCTURE.\n\n"
+        f"above. The letter covers {window_label}. Follow the 7-section LETTER STRUCTURE.\n\n"
         "Rules:\n"
         "- 600-800 words.\n"
         "- Use Indian number formatting (₹X.XX Cr, 1,23,456).\n"
@@ -166,6 +179,9 @@ def _task_block(strict: bool, note: str = "") -> str:
         "- Mention each top performer and underperformer by ticker.\n"
         "- If `rationale_trades` is non-empty, reference at least one by "
         "ticker and quote the rationale text.\n"
+        "- If `change_summary` is present in the context packet, naturally "
+        "incorporate the key portfolio changes into the letter — weave into "
+        "the narrative, do not copy verbatim.\n"
         "- If `has_stale_prices` is true, mention this explicitly in "
         "Section 5 and name the stale tickers.\n"
         "- Sign off with the RM name from the context — never invent.\n"
@@ -193,6 +209,7 @@ def build_prompt_safe(context: dict[str, Any], strict: bool = False) -> str:
     generator may optionally lift the SYSTEM block into ``preamble`` —
     the structure tolerates either approach.
     """
+    cadence = context.get("cadence", "monthly")
     blocks = [
         "[SYSTEM]",
         _system_block(),
@@ -204,14 +221,17 @@ def build_prompt_safe(context: dict[str, Any], strict: bool = False) -> str:
         _examples_block(include_style_samples=True),
         "[CONTEXT PACKET]",
         _serialise_context(context),
-        "[TASK]",
-        _task_block(strict=strict),
     ]
+    cb = _change_summary_block(context)
+    if cb:
+        blocks += ["[PORTFOLIO CHANGES SINCE LAST REVIEW]", cb]
+    blocks += ["[TASK]", _task_block(strict=strict, cadence=cadence)]
     return "\n\n".join(blocks)
 
 
 def build_strict_prompt(context: dict[str, Any], note: str = "") -> str:
     """Regenerate variant — fires when QA score < 7 on the first draft."""
+    cadence = context.get("cadence", "monthly")
     blocks = [
         "[SYSTEM]",
         _system_block(),
@@ -223,7 +243,9 @@ def build_strict_prompt(context: dict[str, Any], note: str = "") -> str:
         _examples_block(include_style_samples=False),
         "[CONTEXT PACKET]",
         _serialise_context(context),
-        "[TASK]",
-        _task_block(strict=True, note=note),
     ]
+    cb = _change_summary_block(context)
+    if cb:
+        blocks += ["[PORTFOLIO CHANGES SINCE LAST REVIEW]", cb]
+    blocks += ["[TASK]", _task_block(strict=True, note=note, cadence=cadence)]
     return "\n\n".join(blocks)
