@@ -38,7 +38,7 @@ export default function AllocationDonut({ drift, loading, error }) {
       <h2 className="text-sm font-semibold text-gray-700 mb-2">Allocation</h2>
       <ResponsiveContainer width="100%" height={220}>
         <PieChart>
-          <Pie data={target} dataKey="value" cx="50%" cy="50%" innerRadius={40} outerRadius={65} strokeWidth={0}>
+          <Pie data={target} dataKey="value" cx="50%" cy="50%" innerRadius={40} outerRadius={65} strokeWidth={0} legendType="none">
             {target.map((entry) => (
               <Cell key={`t-${entry.name}`} fill={COLOURS[entry.name] ?? '#94a3b8'} opacity={0.35} />
             ))}
@@ -48,9 +48,9 @@ export default function AllocationDonut({ drift, loading, error }) {
               <Cell key={`a-${entry.name}`} fill={COLOURS[entry.name] ?? '#94a3b8'} />
             ))}
           </Pie>
-          <Tooltip formatter={(v) => `${v.toFixed(1)}%`} />
+          <Tooltip formatter={(v) => `${Number(v).toFixed(1)}%`} />
           <Legend
-            formatter={(value, entry) => `${value} ${entry.payload.value.toFixed(0)}%`}
+            formatter={(value, entry) => `${value} ${Number(entry.payload.value).toFixed(0)}%`}
             iconType="circle"
             iconSize={10}
           />
