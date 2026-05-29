@@ -45,5 +45,5 @@ def insert_snapshot(sb, row: dict[str, Any]) -> str:
     """Insert a snapshot row and return its id."""
     if sb is None:
         sb = get_supabase()
-    res = sb.table(_TABLE).insert(row).select("id").single().execute()
-    return res.data["id"]
+    res = sb.table(_TABLE).insert(row).execute()
+    return res.data[0]["id"]
