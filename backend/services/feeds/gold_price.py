@@ -7,30 +7,40 @@ import httpx
 
 IBJA_URL = "https://ibja.co/"
 
-_LABELS = {
-    "999": ("Fine Gold", "999"),
-    "22k": ("22 Karat", "916"),
+_SPAN_IDS = {
+    "999": "lblFineGold999",
+    "22k": "lblKarat22",
 }
 
 
 def parse_ibja_html(html: str, purity: str) -> float | None:
-    """Find the gold-rate cell matching the requested purity.
+    """Find the gold-rate value matching the requested purity.
 
-    The IBJA page renders rates inside a `<table>` with a row label like
-    'Fine Gold (999)' followed by a numeric `<td>`. Matching is permissive
-    so the parser tolerates whitespace and label variants.
+    IBJA now renders rates inside a named span:
+      <span id="lblFineGold999">₹ 15646</span>
+    Falls back to the legacy <li> list pattern for resilience.
     """
-    label, code = _LABELS.get(purity, (None, None))
-    if not label:
-        return None
-    pattern = re.compile(
-        rf"{re.escape(label)}[^<]*\(?{code}\)?[^<]*</td>\s*<td[^>]*>\s*([0-9]+(?:\.[0-9]+)?)",
+    # Primary: named span pattern (current IBJA layout)
+    span_id = _SPAN_IDS.get(purity)
+    if span_id:
+        m = re.search(
+            rf'id="{re.escape(span_id)}"[^>]*>\s*₹?\s*([0-9,]+(?:\.[0-9]+)?)',
+            html,
+            re.IGNORECASE,
+        )
+        if m:
+            return float(m.group(1).replace(",", ""))
+
+    # Fallback: plain numeric after "Fine Gold (999):" in a <li>
+    m = re.search(
+        rf"Fine\s+Gold\s*\({re.escape(purity)}\)[^<]*<[^>]+>\s*₹?\s*([0-9,]+(?:\.[0-9]+)?)",
+        html,
         re.IGNORECASE,
     )
-    m = pattern.search(html)
-    if not m:
-        return None
-    return float(m.group(1))
+    if m:
+        return float(m.group(1).replace(",", ""))
+
+    return None
 
 
 def fetch_gold_price_per_gram(purity: str = "999", timeout: float = 30.0) -> dict:
