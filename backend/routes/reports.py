@@ -30,7 +30,9 @@ async def generate_report(request: GenerateReportRequest) -> StreamingResponse:
     ``[[META]]{...}[[END]]`` block to learn ``report_id`` + ``qa_score``.
     """
     try:
-        context = await build_context_packet(request.client_id, request.month)
+        context = await build_context_packet(
+            request.client_id, request.month, cadence=request.cadence
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
@@ -41,6 +43,7 @@ async def generate_report(request: GenerateReportRequest) -> StreamingResponse:
             client_id=request.client_id,
             month=request.month,
             context=context,
+            cadence=request.cadence,
         ):
             yield chunk
 

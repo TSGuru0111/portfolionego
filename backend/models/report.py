@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -9,6 +10,7 @@ from pydantic import BaseModel, Field
 class GenerateReportRequest(BaseModel):
     client_id: str
     month: str = Field(..., description='Month identifier, e.g. "2026-04"')
+    cadence: Literal["weekly", "monthly", "quarterly"] = "monthly"
 
 
 class ReportResponse(BaseModel):

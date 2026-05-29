@@ -173,6 +173,7 @@ async def generate_report_batch(
     client_id: str,
     month: str,
     context: dict[str, Any],
+    cadence: str = "monthly",
 ) -> dict[str, Any]:
     """Non-streamed variant for admin/cron — same QA + regen + save path.
 
@@ -216,6 +217,7 @@ async def generate_report_batch(
                     generated_text=text,
                     qa_score=qa_score,
                     qa_reasons=qa_reasons,
+                    cadence=cadence,
                 )
             except Exception as exc:  # noqa: BLE001
                 await log_error(
@@ -296,6 +298,7 @@ async def generate_report_stream(
     client_id: str,
     month: str,
     context: dict[str, Any],
+    cadence: str = "monthly",
 ) -> AsyncGenerator[str, None]:
     """End-to-end streaming pipeline.
 
@@ -353,6 +356,7 @@ async def generate_report_stream(
                 generated_text=final_text,
                 qa_score=qa_score,
                 qa_reasons=qa_reasons,
+                cadence=cadence,
             )
         except Exception as exc:  # noqa: BLE001
             await log_error(

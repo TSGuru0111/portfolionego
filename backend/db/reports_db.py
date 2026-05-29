@@ -27,6 +27,7 @@ async def save_report(
     qa_reasons: list[str] | None = None,
     hindi_text: str | None = None,
     pdf_url: str | None = None,
+    cadence: str = "monthly",
 ) -> str | None:
     """Insert one report row. Returns the new row id, or None on failure."""
     supabase = _require_supabase()
@@ -36,6 +37,7 @@ async def save_report(
         "generated_text": generated_text,
         "qa_score": qa_score,
         "qa_reasons": qa_reasons or [],
+        "cadence": cadence,
     }
     if hindi_text is not None:
         payload["hindi_text"] = hindi_text
