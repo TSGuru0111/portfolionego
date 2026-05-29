@@ -229,6 +229,55 @@ from db.clients_db import list_all_clients
 from services.snapshot_service import persist_snapshot as _persist_snapshot
 
 
+# ─── Phase 3A: quarterly reports cron ─────────────────────────────────────────
+# EasyCron schedule:
+#   URL:      https://<host>/jobs/quarterly-reports?secret=$JOB_SECRET
+#   Cron:     30 6 1 1,4,7,10 *
+#   Timezone: Asia/Kolkata
+#   Retries:  3
+
+def _current_quarter() -> str:
+    now = datetime.now(timezone.utc)
+    q = (now.month - 1) // 3 + 1
+    return f"Q{q} {now.year}"
+
+
+@router.post("/quarterly-reports")
+async def quarterly_reports(secret: str = Query(...)):
+    """Iterate every client and generate a quarterly report (window=90 days)."""
+    _verify_job_secret(secret)
+    from db.supabase_client import get_supabase
+    sb = get_supabase()
+    clients = list_all_clients(sb)
+    ok = 0
+    failed = 0
+    target_quarter = _current_quarter()
+    for c in clients:
+        cid = c["id"]
+        try:
+            ctx = await build_context_packet(cid, target_quarter, cadence="quarterly")
+            res = await report_generator.generate_report_batch(
+                client_id=cid,
+                month=target_quarter,
+                context=ctx,
+                cadence="quarterly",
+            )
+            if res.get("status") == "ok":
+                ok += 1
+            else:
+                failed += 1
+        except Exception as exc:  # noqa: BLE001
+            failed += 1
+            await log_error("quarterly_reports.client", exc, {"client_id": cid})
+    summary = {"clients_total": len(clients), "ok": ok, "failed": failed}
+    await log_job_run(
+        job_name="quarterly-reports",
+        status="ok" if failed == 0 else "partial",
+        records=ok,
+    )
+    return summary
+
+
 @router.post("/monthly-snapshots")
 async def monthly_snapshots(secret: str = Query(...)):
     """Iterate every client and write a 'monthly' wealth snapshot."""
