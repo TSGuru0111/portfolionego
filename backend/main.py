@@ -111,7 +111,7 @@ async def request_logger_and_limiter(request: Request, call_next):
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ─── Routers ───
-from routes import admin, auth, clients, config, jobs, reports  # noqa: E402
+from routes import admin, auth, clients, config, jobs, reports, wealth  # noqa: E402
 
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(clients.router, prefix="/clients", tags=["Clients"])
@@ -119,6 +119,7 @@ app.include_router(reports.router, prefix="/reports", tags=["Reports"])
 app.include_router(jobs.router, prefix="/jobs", tags=["Jobs"])
 app.include_router(admin.router, prefix="/admin", tags=["Admin"])
 app.include_router(config.router, prefix="/config", tags=["Config"])
+app.include_router(wealth.router, tags=["Wealth"])
 
 
 @app.get("/health", tags=["Health"])
