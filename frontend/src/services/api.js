@@ -304,4 +304,42 @@ export const api = {
       }),
     )
   },
+
+  // ─── RM Dashboard ───
+  getPortfolio: async (clientId) => {
+    const headers = await authHeader()
+    return jsonOrThrow(
+      await fetch(`${API}/clients/${clientId}/portfolio`, { headers }),
+    )
+  },
+
+  getDrift: async (clientId) => {
+    const headers = await authHeader()
+    return jsonOrThrow(await fetch(`${API}/clients/${clientId}/drift`, { headers }))
+  },
+
+  getSnapshots: async (clientId, limit = 12) => {
+    const headers = await authHeader()
+    return jsonOrThrow(
+      await fetch(`${API}/clients/${clientId}/snapshots?limit=${limit}`, { headers }),
+    )
+  },
+
+  getRationaleEvents: async (clientId) => {
+    const headers = await authHeader()
+    return jsonOrThrow(
+      await fetch(`${API}/clients/${clientId}/rationale-events`, { headers }),
+    )
+  },
+
+  logRationaleEvent: async (clientId, payload) => {
+    const headers = await authHeader()
+    return jsonOrThrow(
+      await fetch(`${API}/clients/${clientId}/rationale-events`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }),
+    )
+  },
 }
