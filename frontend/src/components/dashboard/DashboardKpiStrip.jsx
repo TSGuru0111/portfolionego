@@ -18,8 +18,11 @@ export default function DashboardKpiStrip({ portfolio, drift, rationaleEvents })
     ? drift.filter((d) => d.status !== 'on_track').length
     : null;
 
+  // Find the most recent event by event_date (API returns oldest-first)
   const lastEvent = Array.isArray(rationaleEvents) && rationaleEvents.length > 0
-    ? rationaleEvents[0]
+    ? rationaleEvents.reduce((latest, ev) =>
+        new Date(ev.event_date) > new Date(latest.event_date) ? ev : latest
+      )
     : null;
 
   return (

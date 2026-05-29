@@ -52,7 +52,7 @@ export default function RationaleTimeline({ clientId, events, loading, error, on
               <span className={`mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0 ${TYPE_COLOURS[ev.event_type] ?? 'bg-gray-400'}`} />
               <div>
                 <p className="text-xs text-gray-400">
-                  {ev.event_date} · <span className="capitalize">{(ev.event_type ?? '').replace(/_/g, ' ')}</span>
+                  {String(ev.event_date).slice(0, 10)} · <span className="capitalize">{(ev.event_type ?? '').replace(/_/g, ' ')}</span>
                 </p>
                 <p className="text-sm font-medium text-gray-800">{ev.title}</p>
                 {ev.body && <p className="text-xs text-gray-500 mt-0.5">{truncate(ev.body, 80)}</p>}
